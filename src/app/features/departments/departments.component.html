@@ -1,0 +1,45 @@
+<div class="page-header">
+  <div><h1>Départements</h1><p class="page-subtitle">Gestion des départements</p></div>
+  <button class="btn btn-primary" (click)="openCreate()">+ Ajouter</button>
+</div>
+<div class="table-container">
+  <div class="table-toolbar"><h2>Départements</h2>
+    <div class="search-input"><input type="text" placeholder="Rechercher..." [(ngModel)]="search" (input)="onSearch()" /></div>
+  </div>
+  <div *ngIf="loading" class="loading-spinner"></div>
+  <div class="table-scroll" *ngIf="!loading">
+    <table *ngIf="filtered.length > 0">
+      <thead><tr><th>Nom</th><th>Code</th><th>Description</th><th>ID Entreprise</th><th>Actif</th><th>Actions</th></tr></thead>
+      <tbody>
+        <tr *ngFor="let item of filtered">
+          <td>{{ item.name }}</td><td>{{ item.code }}</td><td>{{ item.description }}</td>
+          <td>{{ item.companyId }}</td><td>{{ item.isActive ? 'Oui' : 'Non' }}</td>
+          <td><div class="actions">
+            <button class="btn btn-icon btn-secondary" (click)="openEdit(item)" title="Modifier">✏️</button>
+            <button class="btn btn-icon btn-danger" (click)="delete(item.id)" title="Supprimer">🗑️</button>
+          </div></td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="empty-state" *ngIf="filtered.length === 0"><h3>Aucun résultat</h3></div>
+  </div>
+</div>
+<div class="modal-overlay" *ngIf="showModal" (click)="close()">
+  <div class="modal" (click)="$event.stopPropagation()">
+    <div class="modal-header"><h3>{{ editing ? 'Modifier' : 'Ajouter' }} – Département</h3><button class="btn btn-icon btn-secondary" (click)="close()">✕</button></div>
+    <div class="modal-body">
+      <div class="error-msg" *ngIf="errors['api']">{{ errors["api"] }}</div>
+      <div class="form-group"><label>Nom *</label><input type="text" [(ngModel)]="form.name" /></div>
+      <div class="form-group"><label>Code</label><input type="text" [(ngModel)]="form.code" /></div>
+      <div class="form-group"><label>Description</label><input type="text" [(ngModel)]="form.description" /></div>
+      <div class="form-group"><label>ID Entreprise *</label><input type="text" [(ngModel)]="form.companyId" /></div>
+      <div class="form-group"><label>Actif</label>
+        <select [(ngModel)]="form.isActive"><option [ngValue]="true">Oui</option><option [ngValue]="false">Non</option></select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" (click)="close()">Annuler</button>
+      <button class="btn btn-primary" (click)="save()">{{ editing ? 'Enregistrer' : 'Créer' }}</button>
+    </div>
+  </div>
+</div>

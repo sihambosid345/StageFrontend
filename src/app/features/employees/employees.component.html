@@ -1,0 +1,67 @@
+<div class="page-header">
+  <div><h1>Employés</h1><p class="page-subtitle">Gestion des employés</p></div>
+  <button class="btn btn-primary" (click)="openCreate()">+ Ajouter</button>
+</div>
+<div class="table-container">
+  <div class="table-toolbar"><h2>Employés</h2>
+    <div class="search-input"><input type="text" placeholder="Rechercher..." [(ngModel)]="search" (input)="onSearch()" /></div>
+  </div>
+  <div *ngIf="loading" class="loading-spinner"></div>
+  <div class="table-scroll" *ngIf="!loading">
+    <table *ngIf="filtered.length > 0">
+      <thead><tr><th>Code</th><th>Prénom</th><th>Nom</th><th>CIN</th><th>Email</th><th>Téléphone</th><th>Date embauche</th><th>Salaire base</th><th>Statut</th><th>Actions</th></tr></thead>
+      <tbody>
+        <tr *ngFor="let item of filtered">
+          <td>{{ item.employeeCode }}</td><td>{{ item.firstName }}</td><td>{{ item.lastName }}</td>
+          <td>{{ item.cin }}</td><td>{{ item.email }}</td><td>{{ item.phone }}</td>
+          <td>{{ item.hireDate | date:'dd/MM/yyyy' }}</td><td>{{ item.baseSalary }}</td><td>{{ item.status }}</td>
+          <td><div class="actions">
+            <button class="btn btn-icon btn-secondary" (click)="openEdit(item)" title="Modifier">✏️</button>
+            <button class="btn btn-icon btn-danger" (click)="delete(item.id)" title="Supprimer">🗑️</button>
+          </div></td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="empty-state" *ngIf="filtered.length === 0"><h3>Aucun résultat</h3></div>
+  </div>
+</div>
+<div class="modal-overlay" *ngIf="showModal" (click)="close()">
+  <div class="modal" (click)="$event.stopPropagation()">
+    <div class="modal-header"><h3>{{ editing ? 'Modifier' : 'Ajouter' }} – Employé</h3><button class="btn btn-icon btn-secondary" (click)="close()">✕</button></div>
+    <div class="modal-body">
+      <div class="error-msg" *ngIf="errors['api']">{{ errors["api"] }}</div>
+      <div class="form-group"><label>ID Entreprise *</label><input type="text" [(ngModel)]="form.companyId" /></div>
+      <div class="form-group"><label>Code employé</label><input type="text" [(ngModel)]="form.employeeCode" /></div>
+      <div class="form-group"><label>Prénom *</label><input type="text" [(ngModel)]="form.firstName" /></div>
+      <div class="form-group"><label>Nom *</label><input type="text" [(ngModel)]="form.lastName" /></div>
+      <div class="form-group"><label>CIN</label><input type="text" [(ngModel)]="form.cin" /></div>
+      <div class="form-group"><label>N° CNSS</label><input type="text" [(ngModel)]="form.cnssNumber" /></div>
+      <div class="form-group"><label>Matricule</label><input type="text" [(ngModel)]="form.matricule" /></div>
+      <div class="form-group"><label>Genre</label>
+        <select [(ngModel)]="form.gender"><option value="">--</option><option value="MALE">MALE</option><option value="FEMALE">FEMALE</option></select>
+      </div>
+      <div class="form-group"><label>Date naissance</label><input type="date" [(ngModel)]="form.birthDate" /></div>
+      <div class="form-group"><label>Téléphone</label><input type="text" [(ngModel)]="form.phone" /></div>
+      <div class="form-group"><label>Email</label><input type="email" [(ngModel)]="form.email" /></div>
+      <div class="form-group"><label>Adresse</label><input type="text" [(ngModel)]="form.address" /></div>
+      <div class="form-group"><label>Ville</label><input type="text" [(ngModel)]="form.city" /></div>
+      <div class="form-group"><label>Date embauche *</label><input type="date" [(ngModel)]="form.hireDate" /></div>
+      <div class="form-group"><label>Salaire de base</label><input type="number" [(ngModel)]="form.baseSalary" /></div>
+      <div class="form-group"><label>Mode paiement</label><input type="text" [(ngModel)]="form.paymentMode" /></div>
+      <div class="form-group"><label>Banque</label><input type="text" [(ngModel)]="form.bankName" /></div>
+      <div class="form-group"><label>N° Compte bancaire</label><input type="text" [(ngModel)]="form.bankAccountNumber" /></div>
+      <div class="form-group"><label>ID Département</label><input type="text" [(ngModel)]="form.departmentId" /></div>
+      <div class="form-group"><label>ID Poste</label><input type="text" [(ngModel)]="form.positionId" /></div>
+      <div class="form-group"><label>Statut</label>
+        <select [(ngModel)]="form.status">
+          <option value="ACTIVE">ACTIVE</option><option value="INACTIVE">INACTIVE</option>
+          <option value="SUSPENDED">SUSPENDED</option><option value="LEFT">LEFT</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" (click)="close()">Annuler</button>
+      <button class="btn btn-primary" (click)="save()">{{ editing ? 'Enregistrer' : 'Créer' }}</button>
+    </div>
+  </div>
+</div>

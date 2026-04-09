@@ -1,0 +1,21 @@
+.app-shell {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg-main);
+
+  .main-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: margin-left 0.3s ease;
+  }
+
+  .content-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 2rem;
+    background: var(--bg-main);
+  }
+}
