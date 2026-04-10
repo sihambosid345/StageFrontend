@@ -35,6 +35,7 @@
 .header-right {
   display: flex; align-items: center; gap: 12px;
   position: relative;
+  z-index: 300; // ✅ header-right fوق l-overlay dima
 }
 
 .role-badge {
@@ -86,7 +87,7 @@
   border: 1px solid var(--border-color);
   border-radius: 12px;
   box-shadow: var(--shadow-lg);
-  z-index: 200;
+  z-index: 300; // ✅ nfs l-z-index dyal header-right
   overflow: hidden;
   animation: slideUp 0.15s ease;
 }
@@ -121,5 +122,6 @@
 }
 
 .dropdown-overlay {
-  position: fixed; inset: 0; z-index: 199;
+  position: fixed; inset: 0;
+  z-index: 150; // ✅ overlay bin l-app (50) w l-dropdown (300) — kaysakar l-menu bla ma kayblock l-bouton
 }

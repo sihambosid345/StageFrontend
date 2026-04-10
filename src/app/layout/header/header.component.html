@@ -9,7 +9,6 @@
   </div>
 
   <div class="header-right">
-    <!-- Role badge -->
     <span class="role-badge" *ngIf="auth.isAdmin()">
       <svg viewBox="0 0 16 16" fill="currentColor" width="11"><path d="M8 1a2 2 0 012 2v1h1a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2h1V3a2 2 0 012-2zm0 1a1 1 0 00-1 1v1h2V3a1 1 0 00-1-1z"/></svg>
       ADMIN
@@ -17,8 +16,8 @@
 
     <div class="header-divider"></div>
 
-    <!-- User menu -->
-    <div class="header-user" (click)="showUserMenu = !showUserMenu" [class.active]="showUserMenu">
+    <!-- ✅ toggleMenu($event) — stopPropagation bach mayosal lHostListener -->
+    <div class="header-user" (click)="toggleMenu($event)" [class.active]="showUserMenu">
       <div class="header-avatar">{{ userInitials }}</div>
       <div class="header-user-info">
         <span class="header-user-name">{{ userName }}</span>
@@ -29,8 +28,8 @@
       </svg>
     </div>
 
-    <!-- Dropdown -->
-    <div class="user-dropdown" *ngIf="showUserMenu" (click)="showUserMenu = false">
+    <!-- ✅ pas de (click) sur le dropdown div -->
+    <div class="user-dropdown" *ngIf="showUserMenu">
       <div class="dropdown-info">
         <div class="dropdown-avatar">{{ userInitials }}</div>
         <div>
@@ -39,7 +38,8 @@
         </div>
       </div>
       <div class="dropdown-divider"></div>
-      <button class="dropdown-item danger" (click)="logout()">
+      <!-- ✅ logout($event) — stopPropagation bach mayosal lHostListener -->
+      <button class="dropdown-item danger" (click)="logout($event)">
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" width="16">
           <path d="M13 7l5 5-5 5M18 12H8M8 3H5a2 2 0 00-2 2v10a2 2 0 002 2h3"/>
         </svg>
@@ -48,6 +48,4 @@
     </div>
   </div>
 </header>
-
-<!-- Overlay to close dropdown -->
-<div class="dropdown-overlay" *ngIf="showUserMenu" (click)="showUserMenu = false"></div>
+<!-- ✅ Ħedna l-overlay complètement — HostListener kaydir l-job -->

@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Output } from '@angular/core';
+import { Component, EventEmitter, Output, HostListener, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../core/services/auth.service';
 
@@ -14,9 +14,30 @@ export class HeaderComponent {
   today = new Date();
   showUserMenu = false;
 
-  constructor(public auth: AuthService) {}
+  constructor(public auth: AuthService, private elRef: ElementRef) {}
 
-  onToggle() { this.toggleSidebar.emit(); }
+  // ✅ Ysakar l-menu ila katdir click F BARRA l-component — bla overlay
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: Event) {
+    if (!this.elRef.nativeElement.contains(event.target)) {
+      this.showUserMenu = false;
+    }
+  }
+
+  onToggle() {
+    this.toggleSidebar.emit();
+  }
+
+  toggleMenu(event: Event) {
+    event.stopPropagation();
+    this.showUserMenu = !this.showUserMenu;
+  }
+
+  logout(event: Event) {
+    event.stopPropagation();
+    this.showUserMenu = false;
+    this.auth.logout();
+  }
 
   get userInitials(): string {
     const u = this.auth.currentUser();
@@ -32,6 +53,4 @@ export class HeaderComponent {
   get userEmail(): string {
     return this.auth.currentUser()?.email ?? '';
   }
-
-  logout() { this.auth.logout(); }
 }
