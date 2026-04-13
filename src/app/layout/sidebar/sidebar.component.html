@@ -1,7 +1,7 @@
 <aside class="sidebar" [class.collapsed]="collapsed">
 
   <!-- Logo + Toggle -->
-  <div class="sidebar-logo">
+  <div class="sidebar-logo" (click)="toggleCollapse()" title="Réduire / Développer">
     <div class="logo-icon">
       <svg viewBox="0 0 36 36" fill="none">
         <path d="M6 28V18l12-9 12 9v10" stroke="#93c5fd" stroke-width="2.2" stroke-linecap="round"/>
@@ -10,10 +10,8 @@
       </svg>
     </div>
     <span class="logo-text" *ngIf="!collapsed"><strong>HR</strong>Matrix</span>
-
-    <button class="toggle-btn" (click)="toggleCollapse()" [title]="collapsed ? 'Développer' : 'Réduire'">
-      <i class="bi" [ngClass]="collapsed ? 'bi-chevron-right' : 'bi-chevron-left'"></i>
-    </button>
+    <i class="bi bi-chevron-left toggle-chevron" *ngIf="!collapsed"></i>
+    <i class="bi bi-chevron-right toggle-chevron" *ngIf="collapsed"></i>
   </div>
 
   <!-- Nav -->
