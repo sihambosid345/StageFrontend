@@ -18,7 +18,8 @@ export interface AuthResponse {
     firstName: string;
     lastName: string;
     role: string;
-    companyId: string;
+    companyId?: string | null;
+    isSuperAdmin?: boolean;
     status: string;
     permissions: string[];
   };
@@ -28,7 +29,8 @@ export interface JwtPayload {
   sub: string;
   email: string;
   role: string;
-  companyId: string;
+  isSuperAdmin?: boolean;
+  companyId?: string | null;
   iat: number;
   exp: number;
 }
@@ -45,13 +47,24 @@ export class AuthService {
   readonly currentUser = this._user.asReadonly();
   readonly token       = this._token.asReadonly();
   readonly isLoggedIn  = computed(() => !!this._token() && !this.isExpired());
-  readonly isAdmin     = computed(() => this._user()?.role === 'ADMIN');
+  readonly isAdmin     = computed(() => {
+    const user = this._user();
+    if (!user) return false;
+    const role = user.role;
+    return role === 'ADMIN' || role === 'SUPER_ADMIN' || (user.permissions ?? []).includes('all');
+  });
+
+  readonly isSuperAdmin = computed(() => {
+    const user = this._user();
+    return user?.isSuperAdmin === true || user?.role === 'SUPER_ADMIN' || (user?.permissions ?? []).includes('all');
+  });
+
   readonly userRole    = computed(() => this._user()?.role ?? null);
 
   hasPermission(permission: string): boolean {
     const user = this._user();
     if (!user) return false;
-    if (user.role === 'ADMIN') return true; // Admin a tout
+    if (user.role === 'SUPER_ADMIN' || user.isSuperAdmin || (user.permissions ?? []).includes('all')) return true;
     return (user.permissions ?? []).includes(permission);
   }
 

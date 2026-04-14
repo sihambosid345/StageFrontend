@@ -3,7 +3,7 @@
     <h1>Utilisateurs</h1>
     <p class="page-subtitle">Gestion des utilisateurs et leurs permissions</p>
   </div>
-  <button class="btn btn-primary" (click)="openCreate()">
+  <button class="btn btn-primary" (click)="openCreate()" *ngIf="canManageUsers()">
     <i class="bi bi-person-plus-fill"></i>
     Ajouter
   </button>
@@ -24,6 +24,10 @@
     </div>
   </div>
 
+  <div class="error-msg" *ngIf="error">
+    <i class="bi bi-exclamation-triangle-fill"></i> {{ error }}
+  </div>
+
   <div *ngIf="loading" class="loading-spinner"></div>
 
   <div class="table-scroll" *ngIf="!loading">
@@ -32,6 +36,7 @@
         <tr>
           <th>Utilisateur</th>
           <th>Email</th>
+          <th>Entreprise</th>
           <th>Rôle</th>
           <th>Permissions</th>
           <th>Statut</th>
@@ -47,6 +52,9 @@
             </div>
           </td>
           <td class="text-muted">{{ item.email }}</td>
+          <td>
+            <span class="company-badge">{{ item.company?.name || '—' }}</span>
+          </td>
           <td>
             <span class="badge" [ngClass]="roleBadgeClass(item.role)">{{ item.role }}</span>
           </td>
@@ -75,7 +83,7 @@
             </span>
           </td>
           <td>
-            <div class="actions">
+            <div class="actions" *ngIf="canManageUsers()">
               <button class="btn btn-icon btn-secondary" (click)="openEdit(item)" title="Modifier">
                 <i class="bi bi-pencil"></i>
               </button>
@@ -83,6 +91,7 @@
                 <i class="bi bi-trash"></i>
               </button>
             </div>
+            <div class="text-muted" *ngIf="!canManageUsers()" style="font-size:12px;">Vue seule</div>
           </td>
         </tr>
       </tbody>
@@ -187,6 +196,21 @@
             <option value="BLOCKED">Bloqué</option>
           </select>
         </div>
+      </div>
+
+      <div class="form-group" *ngIf="auth.isSuperAdmin()">
+        <label>Entreprise <span class="required">*</span></label>
+        <select [(ngModel)]="form.companyId">
+          <option value="" disabled>-- Choisir une entreprise --</option>
+          <option *ngFor="let company of companies" [value]="company.id">
+            {{ company.name }}
+          </option>
+        </select>
+      </div>
+
+      <div class="form-group" *ngIf="!auth.isSuperAdmin()">
+        <label>Entreprise</label>
+        <div class="readonly-field">{{ currentCompanyName }}</div>
       </div>
 
       <!-- Permissions -->

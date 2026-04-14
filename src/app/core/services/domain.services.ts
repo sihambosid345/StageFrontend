@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { ApiService } from './api.service';
+import { AuthService } from './auth.service';
 import { Observable } from 'rxjs';
 import {
   Company, Department, Position, Employee, Attendance,
@@ -9,8 +10,14 @@ import {
 
 @Injectable({ providedIn: 'root' })
 export class CompanyService {
-  constructor(private api: ApiService) {}
-  getAll(): Observable<Company[]> { return this.api.get('/companies'); }
+  constructor(private api: ApiService, private auth: AuthService) {}
+
+  getAll(): Observable<Company[]> {
+    return this.auth.isSuperAdmin()
+      ? this.api.get('/companies')
+      : this.api.get('/companies/mine');
+  }
+
   getById(id: string): Observable<Company> { return this.api.get(`/companies/${id}`); }
   create(data: Partial<Company>): Observable<Company> { return this.api.post('/companies', data); }
   update(id: string, data: Partial<Company>): Observable<Company> { return this.api.put(`/companies/${id}`, data); }

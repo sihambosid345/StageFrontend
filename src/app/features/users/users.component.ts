@@ -1,14 +1,16 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { UserService } from '../../core/services/domain.services';
+import { UserService, CompanyService } from '../../core/services/domain.services';
 import { AuthService } from '../../core/services/auth.service';
+import { Company } from '../../core/models';
 
 export const PERMISSIONS = [
   { key: 'dashboard',     label: 'Tableau de bord',    icon: 'bi-grid-1x2' },
   { key: 'employees',     label: 'Employés',            icon: 'bi-people' },
   { key: 'payroll',       label: 'Paie',                icon: 'bi-cash-stack' },
   { key: 'organisation',  label: 'Organisation',        icon: 'bi-building' },
+  { key: 'companies',     label: 'Entreprises',         icon: 'bi-buildings' },
   { key: 'attendance',    label: 'Présences',           icon: 'bi-calendar-check' },
   { key: 'contracts',     label: 'Contrats',            icon: 'bi-file-earmark-text' },
   { key: 'reports',       label: 'Rapports CNSS',       icon: 'bi-file-bar-graph' },
@@ -17,11 +19,11 @@ export const PERMISSIONS = [
 ];
 
 export const ROLE_PRESETS: Record<string, string[]> = {
-  ADMIN:   ['dashboard','employees','payroll','organisation','attendance','contracts','reports','licenses','users'],
-  RH:      ['dashboard','employees','attendance','contracts','reports'],
-  MANAGER: ['dashboard','employees','attendance'],
-  VIEWER:  ['dashboard'],
-  CUSTOM:  [],
+  ADMIN:            ['dashboard','employees','payroll','organisation','attendance','contracts','reports','licenses','users'],
+  HR_MANAGER:       ['dashboard','employees','attendance','contracts','reports','users'],
+  PAYROLL_MANAGER:  ['dashboard','payroll','attendance','users'],
+  EMPLOYEE:         ['dashboard','users'],
+  VIEWER:           ['dashboard','users'],
 };
 
 @Component({
@@ -34,10 +36,11 @@ export const ROLE_PRESETS: Record<string, string[]> = {
 export class UsersComponent implements OnInit {
   readonly PERMISSIONS = PERMISSIONS;
   readonly ROLE_PRESETS = ROLE_PRESETS;
-  readonly ROLES = ['ADMIN', 'RH', 'MANAGER', 'VIEWER', 'CUSTOM'];
+  readonly ROLES = ['ADMIN', 'HR_MANAGER', 'PAYROLL_MANAGER', 'EMPLOYEE', 'VIEWER'];
 
   items: any[] = [];
   filtered: any[] = [];
+  companies: Company[] = [];
   loading = true;
   showModal = false;
   editing = false;
@@ -57,21 +60,49 @@ export class UsersComponent implements OnInit {
     password: string;
     permissions: string[];
     status: string;
+    companyId?: string;
   } = this.emptyForm();
 
-  constructor(private service: UserService, public auth: AuthService) {}
+  constructor(
+    private service: UserService,
+    private companyService: CompanyService,
+    public auth: AuthService
+  ) {}
 
-  ngOnInit() { this.load(); }
+  ngOnInit() {
+    this.load();
+    if (this.auth.isSuperAdmin()) {
+      this.companyService.getAll().subscribe({ next: (data) => this.companies = data });
+    }
+  }
 
   emptyForm() {
     return { firstName: '', lastName: '', email: '', phone: '', role: '', password: '', permissions: [], status: 'ACTIVE' };
   }
 
+  isAdmin(): boolean {
+    return this.auth.currentUser()?.role === 'ADMIN' || this.auth.isSuperAdmin();
+  }
+
+  canManageUsers(): boolean {
+    return this.isAdmin();
+  }
+
   load() {
     this.loading = true;
+    this.error = '';
     this.service.getAll().subscribe({
-      next: (data) => { this.items = data; this.applySearch(); this.loading = false; },
-      error: () => { this.loading = false; }
+      next: (data) => { 
+        this.items = data; 
+        this.applySearch(); 
+        this.loading = false; 
+        console.log('Users loaded:', data);
+      },
+      error: (err) => { 
+        this.loading = false;
+        this.error = err?.error?.error || err?.message || 'Erreur lors du chargement des utilisateurs';
+        console.error('Error loading users:', err);
+      }
     });
   }
 
@@ -90,6 +121,9 @@ export class UsersComponent implements OnInit {
 
   openCreate() {
     this.form = this.emptyForm();
+    if (!this.auth.isSuperAdmin()) {
+      this.form.companyId = this.auth.currentUser()?.companyId ?? '';
+    }
     this.editing = false;
     this.editingId = '';
     this.error = '';
@@ -107,6 +141,7 @@ export class UsersComponent implements OnInit {
       password:    '',
       permissions: Array.isArray(item.permissions) ? [...item.permissions] : [],
       status:      item.status ?? 'ACTIVE',
+      companyId:   item.companyId ?? '',
     };
     this.editing = true;
     this.editingId = item.id;
@@ -132,10 +167,6 @@ export class UsersComponent implements OnInit {
       this.form.permissions.splice(idx, 1);
     } else {
       this.form.permissions.push(key);
-    }
-    // If manually changed, switch role to CUSTOM
-    if (this.form.role !== 'CUSTOM' && this.form.role !== 'ADMIN') {
-      this.form.role = 'CUSTOM';
     }
   }
 
@@ -172,12 +203,18 @@ export class UsersComponent implements OnInit {
       role:        this.form.role,
       permissions: this.form.permissions,
       status:      this.form.status,
+      companyId:   this.form.companyId,
     };
     if (this.form.password) payload.password = this.form.password;
 
-    // For create, need companyId from current user
-    if (!this.editing) {
+    // For non-super-admin users, force companyId to the current user's company
+    if (!this.auth.isSuperAdmin()) {
       payload.companyId = this.auth.currentUser()?.companyId;
+    }
+
+    if (this.auth.isSuperAdmin() && !payload.companyId) {
+      this.error = 'Le super admin doit choisir une entreprise pour le nouvel utilisateur.';
+      return;
     }
 
     const obs = this.editing
@@ -219,6 +256,12 @@ export class UsersComponent implements OnInit {
       MANAGER: 'badge-manager', VIEWER: 'badge-viewer', CUSTOM: 'badge-custom'
     };
     return map[role] ?? 'badge-custom';
+  }
+
+  get currentCompanyName(): string {
+    const companyId = this.auth.currentUser()?.companyId;
+    if (!companyId) return 'Entreprise assignée automatiquement';
+    return this.companies.find(c => c.id === companyId)?.name ?? 'Entreprise assignée automatiquement';
   }
 
   getInitials(item: any): string {

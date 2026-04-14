@@ -42,6 +42,10 @@ export class PayslipsComponent implements OnInit {
     private auth: AuthService
   ) {}
 
+  get canManagePayroll(): boolean {
+    return this.auth.hasPermission('payroll');
+  }
+
   ngOnInit() {
     this.load();
     this.employeeService.getAll().subscribe({ next: (d) => { this.employees = d; }, error: () => {} });
@@ -106,6 +110,11 @@ export class PayslipsComponent implements OnInit {
   }
 
   save() {
+    if (!this.canManagePayroll) {
+      this.error = 'Vous n’avez pas les droits pour créer ou modifier un bulletin de paie.';
+      return;
+    }
+
     if (!this.form.employeeId || !this.form.payrollPeriodId) {
       this.error = 'Employé et période de paie sont obligatoires.'; return;
     }

@@ -24,7 +24,7 @@ export const routes: Routes = [
       },
       {
         path: 'companies',
-        canActivate: [permissionGuard('organisation')],
+        canActivate: [permissionGuard('companies')],
         loadComponent: () => import('./features/companies/companies.component').then(m => m.CompaniesComponent)
       },
       {

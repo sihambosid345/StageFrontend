@@ -30,7 +30,7 @@ export class SidebarComponent {
     {
       label: 'Organisation', icon: 'bi-building-fill', expanded: false,
       children: [
-        { label: 'Entreprises',  icon: 'bi-buildings',            route: '/companies',   permission: 'organisation' },
+        { label: 'Entreprises',  icon: 'bi-buildings',            route: '/companies',   permission: 'companies' },
         { label: 'Départements', icon: 'bi-diagram-3-fill',       route: '/departments', permission: 'organisation' },
         { label: 'Postes',       icon: 'bi-briefcase-fill',       route: '/positions',   permission: 'organisation' },
         { label: 'Licences',     icon: 'bi-shield-fill-check',    route: '/licenses',    permission: 'licenses' },
@@ -63,15 +63,27 @@ export class SidebarComponent {
   }
 
   isVisible(item: NavItem): boolean {
-    if (this.auth.isAdmin()) return true;
-    if (item.children) return item.children.some(c => this.auth.hasPermission(c.permission ?? ''));
+    if (item.children) {
+      return item.children.some(c => {
+        // Hide licenses menu from super admins and company admins
+        if (c.permission === 'licenses' && (this.auth.isSuperAdmin() || this.auth.currentUser()?.role === 'ADMIN')) {
+          return false;
+        }
+        return this.auth.hasPermission(c.permission ?? '');
+      });
+    }
     return this.auth.hasPermission(item.permission ?? '');
   }
 
   visibleChildren(item: NavItem): NavItem[] {
     if (!item.children) return [];
-    if (this.auth.isAdmin()) return item.children;
-    return item.children.filter(c => this.auth.hasPermission(c.permission ?? ''));
+    return item.children.filter(c => {
+      // Hide licenses menu from super admins and company admins
+      if (c.permission === 'licenses' && (this.auth.isSuperAdmin() || this.auth.currentUser()?.role === 'ADMIN')) {
+        return false;
+      }
+      return this.auth.hasPermission(c.permission ?? '');
+    });
   }
 
   toggleGroup(item: NavItem) {

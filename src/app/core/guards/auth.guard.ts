@@ -37,8 +37,16 @@ export const permissionGuard = (permission: string): CanActivateFn => () => {
     return false;
   }
 
-  if (auth.isAdmin()) return true;
+  // Block licenses access for super admins and company admins
+  if (permission === 'licenses') {
+    const user = auth.currentUser();
+    if (user?.isSuperAdmin || user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN') {
+      router.navigate(['/unauthorized']);
+      return false;
+    }
+  }
 
+  if (auth.isSuperAdmin()) return true;
 
   const permissions = auth.getPermissions() || [];
 

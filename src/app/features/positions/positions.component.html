@@ -43,7 +43,7 @@
           <td>
             <span class="company-chip">
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="12"><path d="M2 14V5.5l6-3.5 6 3.5V14"/><rect x="5" y="9" width="3" height="5" rx=".5"/></svg>
-              {{ companyName(item.companyId) }}
+              {{ item.company?.name || '—' }}
             </span>
           </td>
           <td>{{ item.departmentId ? departmentName(item.departmentId) : '—' }}</td>
@@ -94,10 +94,15 @@
       <!-- Entreprise -->
       <div class="form-group" [class.has-error]="hasError('companyId')">
         <label>Entreprise <span class="required">*</span></label>
-        <select [(ngModel)]="form.companyId" (ngModelChange)="onCompanyChange()">
-          <option value="">— Sélectionner une entreprise —</option>
-          <option *ngFor="let c of companies" [value]="c.id">{{ c.name }}</option>
-        </select>
+        <ng-container *ngIf="isSuperAdmin; else fixedCompany">
+          <select [(ngModel)]="form.companyId" (ngModelChange)="onCompanyChange()">
+            <option value="">— Sélectionner une entreprise —</option>
+            <option *ngFor="let c of companies" [value]="c.id">{{ c.name }}</option>
+          </select>
+        </ng-container>
+        <ng-template #fixedCompany>
+          <div class="readonly-field">{{ currentCompanyName }}</div>
+        </ng-template>
         <span class="field-error" *ngIf="hasError('companyId')">{{ errors['companyId'] }}</span>
       </div>
 

@@ -125,7 +125,9 @@ export class EmployeesComponent implements OnInit {
     if (Object.keys(this.errors).length) return;
 
     const payload: any = { ...this.form };
-    payload.companyId = this.auth.currentUser()?.companyId;
+    if (!this.auth.isSuperAdmin()) {
+      payload.companyId = this.auth.currentUser()?.companyId;
+    }
     if (!payload.gender)       delete payload.gender;
     if (!payload.departmentId) delete payload.departmentId;
     if (!payload.positionId)   delete payload.positionId;
@@ -155,6 +157,12 @@ export class EmployeesComponent implements OnInit {
   get filteredDepartments(): Department[] {
     if (!this.form.companyId) return this.departments;
     return this.departments.filter(d => d.companyId === this.form.companyId);
+  }
+
+  get currentCompanyName(): string {
+    const companyId = this.auth.currentUser()?.companyId;
+    if (!companyId) return 'Entreprise assignée automatiquement';
+    return this.companies.find(c => c.id === companyId)?.name ?? 'Entreprise assignée automatiquement';
   }
 
   companyName(id: string)              { return this.companies.find(c => c.id === id)?.name ?? '—'; }

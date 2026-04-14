@@ -1,92 +1,31 @@
-<div class="login-shell">
+﻿<div class="login-shell">
 
-  <!-- ══ LEFT ════════════════════════════════════════════════════════════════ -->
   <div class="lp-left">
-    <div class="lp-bg"></div>
-    <div class="lp-dots"></div>
-    <div class="lp-line"></div>
-
-    <div class="lp-top">
-      <!-- Wordmark -->
-      <div class="wordmark">
-        <div class="wm-icon">
-          <svg viewBox="0 0 36 36" fill="none">
-            <path d="M6 28V18l12-9 12 9v10" stroke="#93c5fd" stroke-width="2.2" stroke-linecap="round"/>
-            <rect x="13" y="21" width="5" height="7" rx="1" fill="#93c5fd" opacity="0.9"/>
-            <rect x="20" y="17" width="7" height="3.5" rx="1" fill="#93c5fd" opacity="0.45"/>
-          </svg>
-        </div>
-        <span class="wm-name"><strong>HR</strong>Matrix</span>
-      </div>
-
-      <!-- Claim -->
-      <div class="claim">
-        <h1>
-          La paie et les RH,
-          <span class="cl-accent">simplifiés.</span>
-        </h1>
-        <p>
-          Plateforme intégrée de gestion des ressources humaines,
-          conforme aux exigences CNSS et IR du Maroc.
-        </p>
-      </div>
-
-      <!-- Features -->
-      <div class="features">
-        <div class="feat">
-          <i class="bi bi-people-fill" style="background:rgba(96,165,250,0.1);color:#60a5fa;"></i>
-          <div class="ft">
-            <strong>Gestion des employés</strong>
-            <span>Dossiers, contrats, présences</span>
-          </div>
-        </div>
-        <div class="feat">
-          <i class="bi bi-cash-coin" style="background:rgba(52,211,153,0.1);color:#34d399;"></i>
-          <div class="ft">
-            <strong>Paie automatisée</strong>
-            <span>Calcul CNSS, AMO et IR intégré</span>
-          </div>
-        </div>
-        <div class="feat">
-          <i class="bi bi-person-gear" style="background:rgba(251,191,36,0.1);color:#fbbf24;"></i>
-          <div class="ft">
-            <strong>Rôles & permissions</strong>
-            <span>Accès granulaires par utilisateur</span>
-          </div>
-        </div>
-      </div>
+    <div class="lp-brand">
+      <div class="brand-name">HRMatrix</div>
+      <p class="brand-text">Solution professionnelle de gestion RH et paie pour entreprises marocaines.</p>
     </div>
 
-    <!-- Stats -->
-    <div class="lp-bottom">
-      <div class="stats">
-        <div class="st">
-          <span class="sv">CNSS</span>
-          <span class="sl">Déclarations auto</span>
-        </div>
-        <div class="st">
-          <span class="sv">JWT</span>
-          <span class="sl">Auth sécurisée</span>
-        </div>
-        <div class="st">
-          <span class="sv">100%</span>
-          <span class="sl">Maroc conforme</span>
-        </div>
-      </div>
+    <div class="lp-summary">
+      <h2>Fonctions essentielles</h2>
+      <ul>
+        <li>Gestion des employés et dossiers</li>
+        <li>Paie conforme CNSS / IR</li>
+        <li>Accès sécurisé avec rôles</li>
+      </ul>
     </div>
+
+    <div class="lp-footer">Authentification sécurisée · Données conformes · Interface épurée</div>
   </div>
 
-  <!-- ══ RIGHT ═══════════════════════════════════════════════════════════════ -->
   <div class="lp-right">
     <div class="lp-card">
-
       <div class="sys-tag">
-        <div class="tag-dot"></div>
         <span>Système opérationnel</span>
       </div>
 
       <h2 class="card-h">Connexion</h2>
-      <p class="card-p">Accédez à votre espace de gestion RH</p>
+      <p class="card-p">Entrez vos identifiants pour accéder à votre espace RH.</p>
 
       <div class="err-box" *ngIf="error()">
         <i class="bi bi-exclamation-circle-fill"></i>
@@ -100,18 +39,19 @@
             <i class="bi bi-envelope f-ico"></i>
             <input id="email" type="email" [(ngModel)]="email"
                    placeholder="votre@email.com"
-                   (keydown)="onKeydown($event)" autocomplete="email"/>
+                   (keydown)="onKeydown($event)" autocomplete="email" />
           </div>
         </div>
+
         <div>
           <label class="f-label" for="password">Mot de passe</label>
           <div class="f-wrap">
             <i class="bi bi-lock f-ico"></i>
             <input id="password" [type]="showPass ? 'text' : 'password'"
                    [(ngModel)]="password" placeholder="••••••••"
-                   (keydown)="onKeydown($event)" autocomplete="current-password"/>
+                   (keydown)="onKeydown($event)" autocomplete="current-password" />
             <button class="eye" type="button" (click)="showPass=!showPass" tabindex="-1">
-              <i class="bi" [ngClass]="showPass ? 'bi-eye-slash':'bi-eye'"></i>
+              <i class="bi" [ngClass]="showPass ? 'bi-eye-slash' : 'bi-eye'"></i>
             </button>
           </div>
         </div>
@@ -128,7 +68,6 @@
         <i class="bi bi-shield-lock-fill"></i>
         <span>Connexion chiffrée — accès réservé aux administrateurs</span>
       </div>
-
     </div>
   </div>
 </div>

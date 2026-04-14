@@ -61,10 +61,15 @@
       <!-- ✅ Select Entreprise -->
       <div class="form-group">
         <label>Entreprise *</label>
-        <select [(ngModel)]="form.companyId" [class.error]="hasError('companyId')">
-          <option value="">-- Sélectionner --</option>
-          <option *ngFor="let c of companies" [value]="c.id">{{ c.name }}</option>
-        </select>
+        <ng-container *ngIf="isSuperAdmin; else fixedCompany">
+          <select [(ngModel)]="form.companyId" [class.error]="hasError('companyId')">
+            <option value="">-- Sélectionner --</option>
+            <option *ngFor="let c of companies" [value]="c.id">{{ c.name }}</option>
+          </select>
+        </ng-container>
+        <ng-template #fixedCompany>
+          <div class="readonly-field">{{ currentCompanyName }}</div>
+        </ng-template>
         <span class="error-text" *ngIf="hasError('companyId')">{{ errors['companyId'] }}</span>
       </div>
 

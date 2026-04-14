@@ -1,6 +1,6 @@
 <div class="page-header">
   <div><h1>Bulletins de paie</h1><p class="page-subtitle">Gestion des bulletins de salaire</p></div>
-  <button class="btn btn-primary" (click)="openCreate()"><i class="bi bi-plus-lg"></i> Ajouter</button>
+  <button *ngIf="canManagePayroll" class="btn btn-primary" (click)="openCreate()"><i class="bi bi-plus-lg"></i> Ajouter</button>
 </div>
 
 <div class="table-container">
@@ -31,10 +31,11 @@
           <td class="amount-cell text-danger">{{ item.totalDeductions | number:'1.2-2' }} MAD</td>
           <td class="amount-cell text-success"><strong>{{ item.netSalary | number:'1.2-2' }} MAD</strong></td>
           <td>
-            <div class="actions">
+            <div class="actions" *ngIf="canManagePayroll">
               <button class="btn btn-icon btn-secondary" (click)="openEdit(item)"><i class="bi bi-pencil"></i></button>
               <button class="btn btn-icon btn-danger" (click)="delete(item.id)"><i class="bi bi-trash"></i></button>
             </div>
+            <span *ngIf="!canManagePayroll" class="text-muted">Lecture seule</span>
           </td>
         </tr>
       </tbody>
@@ -138,7 +139,8 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" (click)="close()"><i class="bi bi-x-circle"></i> Annuler</button>
-      <button class="btn btn-primary" (click)="save()"><i class="bi bi-check-circle-fill"></i> {{ editing ? 'Enregistrer' : 'Créer' }}</button>
+      <button *ngIf="canManagePayroll" class="btn btn-primary" (click)="save()"><i class="bi bi-check-circle-fill"></i> {{ editing ? 'Enregistrer' : 'Créer' }}</button>
+      <button *ngIf="!canManagePayroll" class="btn btn-primary disabled" disabled><i class="bi bi-lock-fill"></i> Pas les droits</button>
     </div>
   </div>
 </div>

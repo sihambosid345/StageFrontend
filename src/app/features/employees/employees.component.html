@@ -96,10 +96,15 @@
         <!-- ✅ Dropdown entreprise -->
         <div class="form-group" [class.has-error]="hasError('companyId')">
           <label><i class="bi bi-building"></i> Entreprise <span class="required">*</span></label>
-          <select [(ngModel)]="form.companyId" (change)="onCompanyChange()">
-            <option value="">— Sélectionner —</option>
-            <option *ngFor="let c of companies" [value]="c.id">{{ c.name }}</option>
-          </select>
+          <ng-container *ngIf="auth.isSuperAdmin(); else readonlyCompany">
+            <select [(ngModel)]="form.companyId" (change)="onCompanyChange()">
+              <option value="">— Sélectionner —</option>
+              <option *ngFor="let c of companies" [value]="c.id">{{ c.name }}</option>
+            </select>
+          </ng-container>
+          <ng-template #readonlyCompany>
+            <div class="readonly-field">{{ currentCompanyName }}</div>
+          </ng-template>
           <span class="field-error" *ngIf="hasError('companyId')">{{ errors['companyId'] }}</span>
         </div>
 

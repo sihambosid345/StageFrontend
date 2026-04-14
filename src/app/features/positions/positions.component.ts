@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { forkJoin } from 'rxjs';
 import { PositionService, CompanyService, DepartmentService } from '../../core/services/domain.services';
+import { AuthService } from '../../core/services/auth.service';
 import {
   Position, Company, Department,
   CreatePositionPayload, UpdatePositionPayload,
@@ -37,6 +38,7 @@ export class PositionsComponent implements OnInit {
     private service: PositionService,
     private companyService: CompanyService,
     private deptService: DepartmentService,
+    private auth: AuthService,
   ) {}
 
   ngOnInit() {
@@ -69,8 +71,24 @@ export class PositionsComponent implements OnInit {
     );
   }
 
+  get isSuperAdmin(): boolean {
+    return this.auth.isSuperAdmin();
+  }
+
+  get currentCompanyId(): string {
+    return this.auth.currentUser()?.companyId ?? '';
+  }
+
+  get currentCompanyName(): string {
+    const companyId = this.currentCompanyId;
+    return this.companies.find(c => c.id === companyId)?.name ?? 'Entreprise assignée automatiquement';
+  }
+
   openCreate() {
-    this.form = { companyId: '', name: '', departmentId: '', code: '', description: '', isActive: true };
+    this.form = {
+      companyId: this.isSuperAdmin ? '' : this.currentCompanyId,
+      name: '', departmentId: '', code: '', description: '', isActive: true
+    };
     this.editing = false; this.editingId = ''; this.errors = {};
     this.showModal = true;
   }
@@ -89,6 +107,10 @@ export class PositionsComponent implements OnInit {
   }
 
   save() {
+    if (!this.isSuperAdmin) {
+      this.form.companyId = this.currentCompanyId;
+    }
+
     this.errors = validateRequired(this.form as any, ['companyId', 'name']);
     if (Object.keys(this.errors).length) return;
 

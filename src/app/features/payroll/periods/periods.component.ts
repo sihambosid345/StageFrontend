@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PayrollPeriodService, CompanyService } from '../../../core/services/domain.services';
+import { AuthService } from '../../../core/services/auth.service';
 import {
   PayrollPeriod, CreatePayrollPeriodPayload, UpdatePayrollPeriodPayload,
   Company, PAYROLL_PERIOD_STATUS_OPTIONS, FormErrors, validateRequired
@@ -34,7 +35,8 @@ export class PeriodsComponent implements OnInit {
 
   constructor(
     private service: PayrollPeriodService,
-    private companyService: CompanyService  // ✅ inject CompanyService
+    private companyService: CompanyService,
+    private auth: AuthService,
   ) {}
 
   ngOnInit() {
@@ -63,9 +65,23 @@ export class PeriodsComponent implements OnInit {
     );
   }
 
+  get isSuperAdmin(): boolean {
+    return this.auth.isSuperAdmin();
+  }
+
+  get currentCompanyId(): string {
+    return this.auth.currentUser()?.companyId ?? '';
+  }
+
+  get currentCompanyName(): string {
+    const companyId = this.currentCompanyId;
+    return this.companies.find(c => c.id === companyId)?.name ?? 'Entreprise assignée automatiquement';
+  }
+
   openCreate() {
     this.form = {
-      companyId: '', year: new Date().getFullYear(), month: new Date().getMonth() + 1,
+      companyId: this.isSuperAdmin ? '' : this.currentCompanyId,
+      year: new Date().getFullYear(), month: new Date().getMonth() + 1,
       startDate: '', endDate: '', status: 'OPEN', isLocked: false, notes: '',
     };
     this.editing = false; this.editingId = ''; this.errors = {};
@@ -83,6 +99,10 @@ export class PeriodsComponent implements OnInit {
   }
 
   save() {
+    if (!this.isSuperAdmin) {
+      this.form.companyId = this.currentCompanyId;
+    }
+
     this.errors = validateRequired(this.form as any, ['companyId', 'year', 'month', 'startDate', 'endDate']);
     if (this.form.month < 1 || this.form.month > 12) this.errors['month'] = 'Mois invalide (1-12)';
     if (Object.keys(this.errors).length) return;

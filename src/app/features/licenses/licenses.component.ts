@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { LicenseService, CompanyService } from '../../core/services/domain.services';
+import { AuthService } from '../../core/services/auth.service';
 import {
   License, Company,
   LicensePlanCode, LicenseStatus, BillingCycle,
@@ -47,7 +48,8 @@ export class LicensesComponent implements OnInit {
 
   constructor(
     private service: LicenseService,
-    private companyService: CompanyService   // ✅ injection CompanyService
+    private companyService: CompanyService,
+    private auth: AuthService,
   ) {}
 
   ngOnInit() {
@@ -84,8 +86,24 @@ export class LicensesComponent implements OnInit {
     );
   }
 
+  get isSuperAdmin(): boolean {
+    return this.auth.isSuperAdmin();
+  }
+
+  get currentCompanyId(): string {
+    return this.auth.currentUser()?.companyId ?? '';
+  }
+
+  get currentCompanyName(): string {
+    const companyId = this.currentCompanyId;
+    return this.companies.find(c => c.id === companyId)?.name ?? 'Entreprise assignée automatiquement';
+  }
+
   openCreate() {
     this.form = this.emptyForm();
+    if (!this.isSuperAdmin) {
+      this.form.companyId = this.currentCompanyId;
+    }
     this.editing = false; this.editingId = ''; this.errors = {};
     this.showModal = true;
   }
@@ -113,6 +131,10 @@ export class LicensesComponent implements OnInit {
   }
 
   save() {
+    if (!this.isSuperAdmin) {
+      this.form.companyId = this.currentCompanyId;
+    }
+
     this.errors = validateRequired(this.form, ['companyId', 'planCode', 'startsAt']);
     if (Object.keys(this.errors).length) return;
 
