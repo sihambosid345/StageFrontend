@@ -65,12 +65,14 @@ export class SidebarComponent {
   isVisible(item: NavItem): boolean {
     if (item.children) {
       return item.children.some(c => {
-        // Hide licenses menu from super admins and company admins
-        if (c.permission === 'licenses' && (this.auth.isSuperAdmin() || this.auth.currentUser()?.role === 'ADMIN')) {
-          return false;
+        if (c.permission === 'licenses') {
+          return this.auth.isSuperAdmin();
         }
         return this.auth.hasPermission(c.permission ?? '');
       });
+    }
+    if (item.permission === 'licenses') {
+      return this.auth.isSuperAdmin();
     }
     return this.auth.hasPermission(item.permission ?? '');
   }
@@ -78,9 +80,8 @@ export class SidebarComponent {
   visibleChildren(item: NavItem): NavItem[] {
     if (!item.children) return [];
     return item.children.filter(c => {
-      // Hide licenses menu from super admins and company admins
-      if (c.permission === 'licenses' && (this.auth.isSuperAdmin() || this.auth.currentUser()?.role === 'ADMIN')) {
-        return false;
+      if (c.permission === 'licenses') {
+        return this.auth.isSuperAdmin();
       }
       return this.auth.hasPermission(c.permission ?? '');
     });

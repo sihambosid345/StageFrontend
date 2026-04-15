@@ -29,8 +29,9 @@ export class DashboardComponent implements OnInit {
   ) {}
 
   ngOnInit() {
-    // /companies/mine retourne la company de l'user connecté (accessible à tous)
-    const companies$ = this.api.get<any[]>('/companies/mine').pipe(catchError(() => of([])));
+    const companies$ = this.auth.isSuperAdmin()
+      ? this.api.get<any[]>('/companies').pipe(catchError(() => of([])))
+      : this.api.get<any[]>('/companies/mine').pipe(catchError(() => of([])));
 
     forkJoin({
       employees:   this.employeeService.getAll().pipe(catchError(() => of([]))),

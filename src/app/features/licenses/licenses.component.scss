@@ -1,119 +1,232 @@
+// Professional Bootstrap-based styling for Licenses Component
+
+// Custom modal backdrop animation
+.modal-backdrop {
+  z-index: 1040;
+}
+
+// Enhanced table styling
+.table {
+  th {
+    border-top: none;
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+  }
+
+  td {
+    vertical-align: middle;
+    border-color: #f1f3f4;
+  }
+
+  tbody tr:hover {
+    background-color: #f8f9fa;
+  }
+}
+
+// Stats cards hover effects
+.card {
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  }
+}
+
+// Enhanced badge styling
 .badge {
-  display: inline-block;
-  padding: 3px 10px;
-  border-radius: 20px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
-
-.badge-plan {
-  background: var(--accent-light);
-  color: var(--accent);
-}
-
-.badge-status-trial      { background: #fff3cd; color: #856404; }
-.badge-status-active     { background: #d1e7dd; color: #0a3622; }
-.badge-status-expired    { background: #f8d7da; color: #58151c; }
-.badge-status-suspended  { background: #fde2e2; color: #842029; }
-.badge-status-cancelled  { background: #e2e3e5; color: #41464b; }
-
-.module-icons {
-  display: flex;
-  gap: 6px;
-}
-
-.module-icon {
-  font-size: 0.95rem;
-  color: var(--border-color);
-  transition: color 0.15s;
-
-  &.active {
-    color: var(--accent);
-  }
-}
-
-.form-section-title {
+  font-weight: 500;
+  border-radius: 6px;
   font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-  margin: 16px 0 10px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
 
-.toggles-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.toggle-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  cursor: pointer;
-  padding: 6px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  transition: all 0.15s;
-
-  input[type="checkbox"] {
-    accent-color: var(--accent);
-    width: 15px;
-    height: 15px;
-    cursor: pointer;
+  &.bg-success {
+    background-color: #198754 !important;
   }
 
-  &:has(input:checked) {
-    border-color: var(--accent);
-    background: var(--accent-light);
-    color: var(--accent);
+  &.bg-warning {
+    background-color: #ffc107 !important;
+    color: #212529 !important;
+  }
+
+  &.bg-danger {
+    background-color: #dc3545 !important;
+  }
+
+  &.bg-info {
+    background-color: #0dcaf0 !important;
+    color: #212529 !important;
+  }
+
+  &.bg-secondary {
+    background-color: #6c757d !important;
+  }
+
+  &.bg-dark {
+    background-color: #212529 !important;
   }
 }
 
-.api-error {
-  background: var(--danger-light);
-  color: var(--danger);
-  border: 1px solid var(--danger);
-  border-radius: 8px;
-  padding: 10px 14px;
-  margin-bottom: 16px;
-  font-size: 0.875rem;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
+// Module badges in table
+.badge.bg-light {
+  border: 1px solid #dee2e6;
+  transition: all 0.2s ease;
 
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
+  &.text-success {
+    border-color: #198754;
+    background-color: rgba(25, 135, 84, 0.1) !important;
+  }
 
-textarea {
-  width: 100%;
-  resize: vertical;
-  min-height: 80px;
-  padding: 8px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-family: inherit;
-  font-size: 0.875rem;
-  color: var(--text-primary);
-  background: var(--bg-input, var(--bg-card));
-  transition: border-color 0.15s;
+  &.text-primary {
+    border-color: #0d6efd;
+    background-color: rgba(13, 110, 253, 0.1) !important;
+  }
 
-  &:focus {
-    outline: none;
-    border-color: var(--accent);
+  &.text-warning {
+    border-color: #ffc107;
+    background-color: rgba(255, 193, 7, 0.1) !important;
+  }
+
+  &.text-info {
+    border-color: #0dcaf0;
+    background-color: rgba(13, 202, 240, 0.1) !important;
+  }
+
+  &.text-secondary {
+    border-color: #6c757d;
+    background-color: rgba(108, 117, 125, 0.1) !important;
   }
 }
 
-.me-2 { margin-right: 0.5rem; }
+// Form enhancements
+.form-check-input:checked {
+  background-color: #0d6efd;
+  border-color: #0d6efd;
+}
+
+.form-check-input:focus {
+  border-color: #0d6efd;
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+// Button group styling
+.btn-group .btn {
+  border-radius: 0;
+
+  &:first-child {
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+  }
+
+  &:last-child {
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+  }
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+}
+
+// Loading spinner enhancement
+.spinner-border {
+  width: 3rem;
+  height: 3rem;
+}
+
+// Empty state icon
+.display-1 {
+  font-size: 4rem;
+  line-height: 1;
+}
+
+// Responsive adjustments
+@media (max-width: 768px) {
+  .container-fluid {
+    padding-left: 15px;
+    padding-right: 15px;
+  }
+
+  .card-header {
+    padding: 1rem 0.75rem;
+
+    h5 {
+      font-size: 1.1rem;
+    }
+  }
+
+  .table-responsive {
+    font-size: 0.875rem;
+  }
+
+  .btn-group {
+    flex-direction: column;
+
+    .btn {
+      border-radius: 6px !important;
+      margin-bottom: 2px;
+    }
+  }
+
+  .modal-dialog {
+    margin: 0.5rem;
+    max-width: calc(100vw - 1rem);
+  }
+}
+
+// Dark mode support (if needed)
+@media (prefers-color-scheme: dark) {
+  .card {
+    background-color: #2d3748;
+    border-color: #4a5568;
+  }
+
+  .table {
+    color: #e2e8f0;
+
+    th {
+      background-color: #2d3748;
+      border-color: #4a5568;
+      color: #a0aec0;
+    }
+
+    td {
+      border-color: #4a5568;
+    }
+
+    tbody tr:hover {
+      background-color: #4a5568;
+    }
+  }
+}
+
+// Animation for modal
+.modal.fade .modal-dialog {
+  transition: transform 0.3s ease-out;
+  transform: translate(0, -50px);
+}
+
+.modal.show .modal-dialog {
+  transform: translate(0, 0);
+}
+
+// Custom scrollbar for table
+.table-responsive::-webkit-scrollbar {
+  height: 8px;
+}
+
+.table-responsive::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}

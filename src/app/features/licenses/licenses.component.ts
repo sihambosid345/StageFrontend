@@ -156,6 +156,39 @@ export class LicensesComponent implements OnInit {
   close()              { this.showModal = false; }
   hasError(f: string)  { return !!this.errors[f]; }
 
+  // Helper methods for styling
+  getPlanBadgeClass(planCode: string): string {
+    const classes: Record<string, string> = {
+      'BASIC': 'bg-secondary',
+      'PRO': 'bg-info',
+      'BUSINESS': 'bg-warning text-dark',
+      'ENTERPRISE': 'bg-danger'
+    };
+    return classes[planCode] || 'bg-secondary';
+  }
+
+  getStatusBadgeClass(status: string): string {
+    const classes: Record<string, string> = {
+      'TRIAL': 'bg-warning text-dark',
+      'ACTIVE': 'bg-success',
+      'EXPIRED': 'bg-danger',
+      'SUSPENDED': 'bg-secondary',
+      'CANCELLED': 'bg-dark'
+    };
+    return classes[status] || 'bg-secondary';
+  }
+
+  getStatusIcon(status: string): string {
+    const icons: Record<string, string> = {
+      'TRIAL': 'bi-clock',
+      'ACTIVE': 'bi-check-circle-fill',
+      'EXPIRED': 'bi-x-circle-fill',
+      'SUSPENDED': 'bi-pause-circle-fill',
+      'CANCELLED': 'bi-x-octagon-fill'
+    };
+    return icons[status] || 'bi-question-circle';
+  }
+
   private emptyForm(): any {
     return {
       companyId: '', planCode: 'BASIC', status: 'TRIAL',

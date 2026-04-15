@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CompanyService } from '../../core/services/domain.services';
+import { AuthService } from '../../core/services/auth.service';
 import {
   Company, CreateCompanyPayload, UpdateCompanyPayload,
   COMPANY_STATUS_OPTIONS, FormErrors, validateRequired
@@ -43,7 +44,10 @@ export class CompaniesComponent implements OnInit {
     status:        'ACTIVE',
   };
 
-  constructor(private service: CompanyService) {}
+  constructor(
+    private service: CompanyService,
+    private auth: AuthService
+  ) {}
 
   ngOnInit() { this.load(); }
 
@@ -115,4 +119,8 @@ export class CompaniesComponent implements OnInit {
 
   close()              { this.showModal = false; }
   hasError(f: string)  { return !!this.errors[f]; }
+
+  get isSuperAdmin(): boolean {
+    return this.auth.isSuperAdmin();
+  }
 }

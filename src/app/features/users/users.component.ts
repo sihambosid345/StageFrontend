@@ -19,6 +19,7 @@ export const PERMISSIONS = [
 ];
 
 export const ROLE_PRESETS: Record<string, string[]> = {
+  SUPER_ADMIN:      ['dashboard','employees','payroll','organisation','attendance','contracts','reports','licenses','users'],
   ADMIN:            ['dashboard','employees','payroll','organisation','attendance','contracts','reports','licenses','users'],
   HR_MANAGER:       ['dashboard','employees','attendance','contracts','reports','users'],
   PAYROLL_MANAGER:  ['dashboard','payroll','attendance','users'],
@@ -36,7 +37,7 @@ export const ROLE_PRESETS: Record<string, string[]> = {
 export class UsersComponent implements OnInit {
   readonly PERMISSIONS = PERMISSIONS;
   readonly ROLE_PRESETS = ROLE_PRESETS;
-  readonly ROLES = ['ADMIN', 'HR_MANAGER', 'PAYROLL_MANAGER', 'EMPLOYEE', 'VIEWER'];
+  readonly ROLES = ['SUPER_ADMIN', 'ADMIN', 'HR_MANAGER', 'PAYROLL_MANAGER', 'EMPLOYEE', 'VIEWER'];
 
   items: any[] = [];
   filtered: any[] = [];
@@ -150,10 +151,19 @@ export class UsersComponent implements OnInit {
     this.showModal = true;
   }
 
+  get visibleRoles(): string[] {
+    return this.auth.isSuperAdmin()
+      ? this.ROLES
+      : this.ROLES.filter((role) => role !== 'SUPER_ADMIN');
+  }
+
   onRoleChange() {
     const preset = ROLE_PRESETS[this.form.role];
     if (preset !== undefined) {
       this.form.permissions = [...preset];
+    }
+    if (this.form.role === 'SUPER_ADMIN') {
+      this.form.companyId = undefined;
     }
   }
 
@@ -212,7 +222,12 @@ export class UsersComponent implements OnInit {
       payload.companyId = this.auth.currentUser()?.companyId;
     }
 
-    if (this.auth.isSuperAdmin() && !payload.companyId) {
+    // Super admin users creating or editing SUPER_ADMIN accounts do not need a companyId
+    if (this.auth.isSuperAdmin() && this.form.role === 'SUPER_ADMIN') {
+      delete payload.companyId;
+    }
+
+    if (this.auth.isSuperAdmin() && this.form.role !== 'SUPER_ADMIN' && !payload.companyId) {
       this.error = 'Le super admin doit choisir une entreprise pour le nouvel utilisateur.';
       return;
     }

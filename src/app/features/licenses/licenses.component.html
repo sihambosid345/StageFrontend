@@ -1,208 +1,490 @@
-<div class="page-header">
-  <div>
-    <h1>Licences</h1>
-    <p class="page-subtitle">Gestion des licences</p>
-  </div>
-  <button class="btn btn-primary" (click)="openCreate()">
-    <i class="bi bi-plus-lg"></i>
-    Ajouter
-  </button>
-</div>
-
-<div class="table-container">
-  <div class="table-toolbar">
-    <h2>Licences</h2>
-    <div class="search-input">
-      <i class="bi bi-search"></i>
-      <input type="text" placeholder="Rechercher..." [(ngModel)]="search" (input)="onSearch()" />
+<div class="container-fluid py-4">
+  <!-- Page Header -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="d-flex justify-content-between align-items-center bg-white p-4 rounded-3 shadow-sm">
+        <div>
+          <h1 class="h3 mb-1 text-dark fw-bold">
+            <i class="bi bi-patch-check-fill text-primary me-2"></i>
+            Gestion des Licences
+          </h1>
+          <p class="text-muted mb-0">Administration et suivi des licences d'entreprise</p>
+        </div>
+        <button class="btn btn-primary btn-lg px-4" (click)="openCreate()">
+          <i class="bi bi-plus-circle-fill me-2"></i>
+          Nouvelle Licence
+        </button>
+      </div>
     </div>
   </div>
 
-  <div *ngIf="loading" class="loading-spinner"></div>
-
-  <div class="table-scroll" *ngIf="!loading">
-    <table *ngIf="filtered.length > 0">
-      <thead>
-        <tr>
-          <th>Entreprise</th>
-          <th>Plan</th>
-          <th>Statut</th>
-          <th>Cycle</th>
-          <th>Début</th>
-          <th>Fin</th>
-          <th>Max users</th>
-          <th>Max employés</th>
-          <th>Modules</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let item of filtered">
-          <!-- ✅ Nom entreprise au lieu de l'ID -->
-          <td><strong>{{ companyName(item.companyId) }}</strong></td>
-          <td><span class="badge badge-plan">{{ item.planCode }}</span></td>
-          <td><span class="badge badge-status-{{item.status.toLowerCase()}}">{{ item.status }}</span></td>
-          <td>{{ item.billingCycle }}</td>
-          <td>{{ item.startsAt | date:'dd/MM/yyyy' }}</td>
-          <td>{{ item.endsAt ? (item.endsAt | date:'dd/MM/yyyy') : '—' }}</td>
-          <td>{{ item.maxUsers ?? '∞' }}</td>
-          <td>{{ item.maxEmployees ?? '∞' }}</td>
-          <td>
-            <div class="module-icons">
-              <span class="module-icon" [class.active]="item.payrollEnabled" title="Paie"><i class="bi bi-cash-stack"></i></span>
-              <span class="module-icon" [class.active]="item.rhEnabled" title="RH"><i class="bi bi-people"></i></span>
-              <span class="module-icon" [class.active]="item.cnssEnabled" title="CNSS"><i class="bi bi-shield-check"></i></span>
-              <span class="module-icon" [class.active]="item.taxEnabled" title="Taxes"><i class="bi bi-percent"></i></span>
-              <span class="module-icon" [class.active]="item.damancomEnabled" title="Damancom"><i class="bi bi-building"></i></span>
+  <!-- Stats Cards -->
+  <div class="row mb-4" *ngIf="!loading">
+    <div class="col-xl-3 col-md-6 mb-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body d-flex align-items-center">
+          <div class="flex-shrink-0 me-3">
+            <div class="bg-primary bg-opacity-10 p-3 rounded-3">
+              <i class="bi bi-patch-check-fill text-primary fs-4"></i>
             </div>
-          </td>
-          <td>
-            <div class="actions">
-              <button class="btn btn-icon btn-secondary" (click)="openEdit(item)" title="Modifier">
-                <i class="bi bi-pencil"></i>
-              </button>
-              <button class="btn btn-icon btn-danger" (click)="delete(item.id)" title="Supprimer">
-                <i class="bi bi-trash"></i>
+          </div>
+          <div>
+            <h6 class="card-title text-muted mb-1">Total Licences</h6>
+            <h3 class="mb-0 text-dark">{{ items.length }}</h3>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-xl-3 col-md-6 mb-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body d-flex align-items-center">
+          <div class="flex-shrink-0 me-3">
+            <div class="bg-success bg-opacity-10 p-3 rounded-3">
+              <i class="bi bi-check-circle-fill text-success fs-4"></i>
+            </div>
+          </div>
+          <div>
+            <h6 class="card-title text-muted mb-1">Licences Actives</h6>
+            <h3 class="mb-0 text-dark">{{ items.filter(l => l.status === 'ACTIVE').length }}</h3>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-xl-3 col-md-6 mb-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body d-flex align-items-center">
+          <div class="flex-shrink-0 me-3">
+            <div class="bg-warning bg-opacity-10 p-3 rounded-3">
+              <i class="bi bi-clock-fill text-warning fs-4"></i>
+            </div>
+          </div>
+          <div>
+            <h6 class="card-title text-muted mb-1">En Essai</h6>
+            <h3 class="mb-0 text-dark">{{ items.filter(l => l.status === 'TRIAL').length }}</h3>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-xl-3 col-md-6 mb-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body d-flex align-items-center">
+          <div class="flex-shrink-0 me-3">
+            <div class="bg-danger bg-opacity-10 p-3 rounded-3">
+              <i class="bi bi-x-circle-fill text-danger fs-4"></i>
+            </div>
+          </div>
+          <div>
+            <h6 class="card-title text-muted mb-1">Expirées</h6>
+            <h3 class="mb-0 text-dark">{{ items.filter(l => l.status === 'EXPIRED').length }}</h3>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="row">
+    <div class="col-12">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-0 py-3">
+          <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0 text-dark fw-semibold">
+              <i class="bi bi-list-check me-2 text-primary"></i>
+              Liste des Licences
+            </h5>
+            <div class="input-group" style="width: 300px;">
+              <span class="input-group-text bg-light border-end-0">
+                <i class="bi bi-search text-muted"></i>
+              </span>
+              <input type="text" class="form-control border-start-0 bg-light"
+                     placeholder="Rechercher une licence..."
+                     [(ngModel)]="search" (input)="onSearch()">
+            </div>
+          </div>
+        </div>
+
+        <div class="card-body p-0">
+          <!-- Loading State -->
+          <div *ngIf="loading" class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Chargement...</span>
+            </div>
+            <p class="text-muted mt-2">Chargement des licences...</p>
+          </div>
+
+          <!-- Table -->
+          <div *ngIf="!loading">
+            <div class="table-responsive">
+              <table class="table table-hover mb-0" *ngIf="filtered.length > 0">
+                <thead class="table-light">
+                  <tr>
+                    <th class="border-0 fw-semibold text-muted py-3 px-4">
+                      <i class="bi bi-building me-2"></i>Entreprise
+                    </th>
+                    <th class="border-0 fw-semibold text-muted py-3">
+                      <i class="bi bi-stars me-2"></i>Plan
+                    </th>
+                    <th class="border-0 fw-semibold text-muted py-3">
+                      <i class="bi bi-toggle-on me-2"></i>Statut
+                    </th>
+                    <th class="border-0 fw-semibold text-muted py-3">
+                      <i class="bi bi-arrow-repeat me-2"></i>Cycle
+                    </th>
+                    <th class="border-0 fw-semibold text-muted py-3">
+                      <i class="bi bi-calendar-check me-2"></i>Début
+                    </th>
+                    <th class="border-0 fw-semibold text-muted py-3">
+                      <i class="bi bi-calendar-x me-2"></i>Fin
+                    </th>
+                    <th class="border-0 fw-semibold text-muted py-3">
+                      <i class="bi bi-people me-2"></i>Utilisateurs
+                    </th>
+                    <th class="border-0 fw-semibold text-muted py-3">
+                      <i class="bi bi-person-badge me-2"></i>Employés
+                    </th>
+                    <th class="border-0 fw-semibold text-muted py-3">
+                      <i class="bi bi-grid-3x3-gap me-2"></i>Modules
+                    </th>
+                    <th class="border-0 fw-semibold text-muted py-3 text-center">
+                      <i class="bi bi-gear me-2"></i>Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let item of filtered" class="align-middle">
+                    <td class="py-3 px-4">
+                      <div class="d-flex align-items-center">
+                        <div class="bg-primary bg-opacity-10 p-2 rounded-2 me-3">
+                          <i class="bi bi-building-fill text-primary"></i>
+                        </div>
+                        <div>
+                          <div class="fw-semibold text-dark">{{ companyName(item.companyId) }}</div>
+                          <small class="text-muted">{{ item.companyId.slice(0, 8) }}...</small>
+                        </div>
+                      </div>
+                    </td>
+                    <td class="py-3">
+                      <span class="badge fs-6 px-3 py-2" [ngClass]="getPlanBadgeClass(item.planCode)">
+                        {{ item.planCode }}
+                      </span>
+                    </td>
+                    <td class="py-3">
+                      <span class="badge fs-6 px-3 py-2" [ngClass]="getStatusBadgeClass(item.status)">
+                        <i class="bi me-1" [ngClass]="getStatusIcon(item.status)"></i>
+                        {{ item.status }}
+                      </span>
+                    </td>
+                    <td class="py-3">
+                      <span class="badge bg-light text-dark px-3 py-2">
+                        {{ item.billingCycle }}
+                      </span>
+                    </td>
+                    <td class="py-3">
+                      <div class="d-flex align-items-center">
+                        <i class="bi bi-calendar-check text-success me-2"></i>
+                        {{ item.startsAt | date:'dd/MM/yyyy' }}
+                      </div>
+                    </td>
+                    <td class="py-3">
+                      <div class="d-flex align-items-center" *ngIf="item.endsAt; else unlimited">
+                        <i class="bi bi-calendar-x text-danger me-2"></i>
+                        {{ item.endsAt | date:'dd/MM/yyyy' }}
+                      </div>
+                      <ng-template #unlimited>
+                        <span class="text-muted">
+                          <i class="bi bi-infinity me-1"></i>Illimité
+                        </span>
+                      </ng-template>
+                    </td>
+                    <td class="py-3">
+                      <div class="d-flex align-items-center">
+                        <i class="bi bi-person-badge text-primary me-2"></i>
+                        <span class="fw-semibold">{{ item.maxUsers || '∞' }}</span>
+                      </div>
+                    </td>
+                    <td class="py-3">
+                      <div class="d-flex align-items-center">
+                        <i class="bi bi-people text-info me-2"></i>
+                        <span class="fw-semibold">{{ item.maxEmployees || '∞' }}</span>
+                      </div>
+                    </td>
+                    <td class="py-3">
+                      <div class="d-flex gap-1 flex-wrap">
+                        <span class="badge bg-light text-dark p-1" [title]="'Paie'"
+                              [ngClass]="{'bg-success bg-opacity-10 text-success': item.payrollEnabled}">
+                          <i class="bi bi-cash-stack"></i>
+                        </span>
+                        <span class="badge bg-light text-dark p-1" [title]="'RH'"
+                              [ngClass]="{'bg-primary bg-opacity-10 text-primary': item.rhEnabled}">
+                          <i class="bi bi-people"></i>
+                        </span>
+                        <span class="badge bg-light text-dark p-1" [title]="'CNSS'"
+                              [ngClass]="{'bg-warning bg-opacity-10 text-warning': item.cnssEnabled}">
+                          <i class="bi bi-shield-check"></i>
+                        </span>
+                        <span class="badge bg-light text-dark p-1" [title]="'Taxes'"
+                              [ngClass]="{'bg-info bg-opacity-10 text-info': item.taxEnabled}">
+                          <i class="bi bi-percent"></i>
+                        </span>
+                        <span class="badge bg-light text-dark p-1" [title]="'Damancom'"
+                              [ngClass]="{'bg-secondary bg-opacity-10 text-secondary': item.damancomEnabled}">
+                          <i class="bi bi-building"></i>
+                        </span>
+                      </div>
+                    </td>
+                    <td class="py-3 text-center">
+                      <div class="btn-group" role="group">
+                        <button class="btn btn-sm btn-outline-primary"
+                                (click)="openEdit(item)"
+                                title="Modifier">
+                          <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger"
+                                (click)="delete(item.id)"
+                                title="Supprimer">
+                          <i class="bi bi-trash"></i>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Empty State -->
+            <div *ngIf="filtered.length === 0" class="text-center py-5">
+              <div class="mb-4">
+                <i class="bi bi-patch-check display-1 text-muted"></i>
+              </div>
+              <h4 class="text-muted mb-2">Aucune licence trouvée</h4>
+              <p class="text-muted mb-4">Commencez par créer votre première licence d'entreprise.</p>
+              <button class="btn btn-primary btn-lg px-4" (click)="openCreate()">
+                <i class="bi bi-plus-circle-fill me-2"></i>
+                Créer une licence
               </button>
             </div>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-
-    <div class="empty-state" *ngIf="filtered.length === 0">
-      <div class="empty-icon"><i class="bi bi-patch-check" style="font-size:2.5rem;color:var(--text-muted)"></i></div>
-      <h3>Aucune licence trouvée</h3>
-      <p>Commencez par en ajouter une.</p>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
 
 <!-- Modal -->
-<div class="modal-overlay" *ngIf="showModal" (click)="close()">
-  <div class="modal" (click)="$event.stopPropagation()">
-    <div class="modal-header">
-      <h3>
-        <i class="bi bi-patch-check me-2"></i>
-        {{ editing ? 'Modifier' : 'Ajouter' }} – Licence
-      </h3>
-      <button class="btn btn-icon btn-secondary" (click)="close()">
-        <i class="bi bi-x-lg"></i>
-      </button>
-    </div>
-
-    <div class="modal-body">
-      <div class="api-error" *ngIf="errors['api']">
-        <i class="bi bi-exclamation-triangle-fill"></i> {{ errors['api'] }}
+<div class="modal fade" [class.show]="showModal" [style.display]="showModal ? 'block' : 'none'"
+     tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title">
+          <i class="bi bi-patch-check-fill me-2"></i>
+          {{ editing ? 'Modifier' : 'Créer' }} une Licence
+        </h5>
+        <button type="button" class="btn-close btn-close-white" (click)="close()"></button>
       </div>
 
-      <div class="form-row">
-        <!-- ✅ Dropdown entreprise avec nom -->
-        <div class="form-group" [class.has-error]="hasError('companyId')">
-          <label><i class="bi bi-building"></i> Entreprise <span class="required">*</span></label>
-          <ng-container *ngIf="isSuperAdmin; else fixedCompany">
-            <select [(ngModel)]="form.companyId">
-              <option value="">— Sélectionner une entreprise —</option>
-              <option *ngFor="let c of companies" [value]="c.id">{{ c.name }}</option>
-            </select>
-          </ng-container>
-          <ng-template #fixedCompany>
-            <div class="readonly-field">{{ currentCompanyName }}</div>
-          </ng-template>
-          <span class="field-error" *ngIf="hasError('companyId')">{{ errors['companyId'] }}</span>
+      <div class="modal-body p-4">
+        <!-- API Error -->
+        <div class="alert alert-danger d-flex align-items-center" *ngIf="errors['api']">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i>
+          <div>{{ errors['api'] }}</div>
         </div>
 
-        <div class="form-group" [class.has-error]="hasError('planCode')">
-          <label><i class="bi bi-stars"></i> Plan <span class="required">*</span></label>
-          <select [(ngModel)]="form.planCode">
-            <option *ngFor="let p of planOptions" [value]="p">{{ p }}</option>
-          </select>
-          <span class="field-error" *ngIf="hasError('planCode')">{{ errors['planCode'] }}</span>
-        </div>
+        <form>
+          <!-- Company Selection -->
+          <div class="row mb-3">
+            <div class="col-12">
+              <label class="form-label fw-semibold">
+                <i class="bi bi-building text-primary me-1"></i>
+                Entreprise <span class="text-danger">*</span>
+              </label>
+              <ng-container *ngIf="isSuperAdmin; else fixedCompany">
+                <select class="form-select" [(ngModel)]="form.companyId" name="companyId"
+                        [class.is-invalid]="hasError('companyId')">
+                  <option value="">— Sélectionner une entreprise —</option>
+                  <option *ngFor="let c of companies" [value]="c.id">{{ c.name }}</option>
+                </select>
+              </ng-container>
+              <ng-template #fixedCompany>
+                <input type="text" class="form-control" [value]="currentCompanyName" readonly>
+              </ng-template>
+              <div class="invalid-feedback" *ngIf="hasError('companyId')">
+                {{ errors['companyId'] }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Plan and Status -->
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">
+                <i class="bi bi-stars text-warning me-1"></i>
+                Plan <span class="text-danger">*</span>
+              </label>
+              <select class="form-select" [(ngModel)]="form.planCode" name="planCode"
+                      [class.is-invalid]="hasError('planCode')">
+                <option *ngFor="let p of planOptions" [value]="p">{{ p }}</option>
+              </select>
+              <div class="invalid-feedback" *ngIf="hasError('planCode')">
+                {{ errors['planCode'] }}
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">
+                <i class="bi bi-toggle-on text-info me-1"></i>
+                Statut
+              </label>
+              <select class="form-select" [(ngModel)]="form.status" name="status">
+                <option *ngFor="let s of statusOptions" [value]="s">{{ s }}</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Billing Cycle and Dates -->
+          <div class="row mb-3">
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">
+                <i class="bi bi-arrow-repeat text-secondary me-1"></i>
+                Cycle de facturation
+              </label>
+              <select class="form-select" [(ngModel)]="form.billingCycle" name="billingCycle">
+                <option *ngFor="let b of billingOptions" [value]="b">{{ b }}</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">
+                <i class="bi bi-calendar-check text-success me-1"></i>
+                Date de début <span class="text-danger">*</span>
+              </label>
+              <input type="date" class="form-control" [(ngModel)]="form.startsAt" name="startsAt"
+                     [class.is-invalid]="hasError('startsAt')">
+              <div class="invalid-feedback" *ngIf="hasError('startsAt')">
+                {{ errors['startsAt'] }}
+              </div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">
+                <i class="bi bi-calendar-x text-danger me-1"></i>
+                Date de fin
+              </label>
+              <input type="date" class="form-control" [(ngModel)]="form.endsAt" name="endsAt">
+              <small class="form-text text-muted">Laisser vide pour illimité</small>
+            </div>
+          </div>
+
+          <!-- Limits -->
+          <div class="row mb-4">
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">
+                <i class="bi bi-person-badge text-primary me-1"></i>
+                Max utilisateurs
+              </label>
+              <input type="number" class="form-control" [(ngModel)]="form.maxUsers" name="maxUsers"
+                     placeholder="Illimité" min="1">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">
+                <i class="bi bi-people text-info me-1"></i>
+                Max employés
+              </label>
+              <input type="number" class="form-control" [(ngModel)]="form.maxEmployees" name="maxEmployees"
+                     placeholder="Illimité" min="1">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">
+                <i class="bi bi-hdd text-secondary me-1"></i>
+                Max stockage (Mo)
+              </label>
+              <input type="number" class="form-control" [(ngModel)]="form.maxStorageMb" name="maxStorageMb"
+                     placeholder="Illimité" min="1">
+            </div>
+          </div>
+
+          <!-- Modules Section -->
+          <div class="mb-4">
+            <h6 class="fw-semibold mb-3">
+              <i class="bi bi-grid-3x3-gap text-primary me-2"></i>
+              Modules activés
+            </h6>
+            <div class="row">
+              <div class="col-md-6 mb-2">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" id="payrollEnabled"
+                         [(ngModel)]="form.payrollEnabled" name="payrollEnabled">
+                  <label class="form-check-label fw-semibold" for="payrollEnabled">
+                    <i class="bi bi-cash-stack text-success me-2"></i>
+                    Module Paie
+                  </label>
+                </div>
+              </div>
+              <div class="col-md-6 mb-2">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" id="rhEnabled"
+                         [(ngModel)]="form.rhEnabled" name="rhEnabled">
+                  <label class="form-check-label fw-semibold" for="rhEnabled">
+                    <i class="bi bi-people text-primary me-2"></i>
+                    Module RH
+                  </label>
+                </div>
+              </div>
+              <div class="col-md-6 mb-2">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" id="cnssEnabled"
+                         [(ngModel)]="form.cnssEnabled" name="cnssEnabled">
+                  <label class="form-check-label fw-semibold" for="cnssEnabled">
+                    <i class="bi bi-shield-check text-warning me-2"></i>
+                    Module CNSS
+                  </label>
+                </div>
+              </div>
+              <div class="col-md-6 mb-2">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" id="taxEnabled"
+                         [(ngModel)]="form.taxEnabled" name="taxEnabled">
+                  <label class="form-check-label fw-semibold" for="taxEnabled">
+                    <i class="bi bi-percent text-info me-2"></i>
+                    Module Taxes
+                  </label>
+                </div>
+              </div>
+              <div class="col-md-6 mb-2">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" id="damancomEnabled"
+                         [(ngModel)]="form.damancomEnabled" name="damancomEnabled">
+                  <label class="form-check-label fw-semibold" for="damancomEnabled">
+                    <i class="bi bi-building text-secondary me-2"></i>
+                    Module Damancom
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Notes -->
+          <div class="mb-3">
+            <label class="form-label fw-semibold">
+              <i class="bi bi-sticky text-muted me-1"></i>
+              Notes
+            </label>
+            <textarea class="form-control" [(ngModel)]="form.notes" name="notes"
+                      rows="3" placeholder="Notes optionnelles..."></textarea>
+          </div>
+        </form>
       </div>
 
-      <div class="form-row">
-        <div class="form-group">
-          <label><i class="bi bi-toggle-on"></i> Statut</label>
-          <select [(ngModel)]="form.status">
-            <option *ngFor="let s of statusOptions" [value]="s">{{ s }}</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label><i class="bi bi-arrow-repeat"></i> Cycle de facturation</label>
-          <select [(ngModel)]="form.billingCycle">
-            <option *ngFor="let b of billingOptions" [value]="b">{{ b }}</option>
-          </select>
-        </div>
+      <div class="modal-footer bg-light">
+        <button type="button" class="btn btn-secondary" (click)="close()">
+          <i class="bi bi-x-circle me-1"></i>
+          Annuler
+        </button>
+        <button type="button" class="btn btn-primary" (click)="save()">
+          <i class="bi bi-check-circle me-1"></i>
+          {{ editing ? 'Enregistrer' : 'Créer' }}
+        </button>
       </div>
-
-      <div class="form-row">
-        <div class="form-group" [class.has-error]="hasError('startsAt')">
-          <label><i class="bi bi-calendar-check"></i> Date de début <span class="required">*</span></label>
-          <input type="date" [(ngModel)]="form.startsAt" />
-          <span class="field-error" *ngIf="hasError('startsAt')">{{ errors['startsAt'] }}</span>
-        </div>
-        <div class="form-group">
-          <label><i class="bi bi-calendar-x"></i> Date de fin</label>
-          <input type="date" [(ngModel)]="form.endsAt" />
-        </div>
-      </div>
-
-      <div class="form-row">
-        <div class="form-group">
-          <label><i class="bi bi-person-badge"></i> Max utilisateurs</label>
-          <input type="number" [(ngModel)]="form.maxUsers" placeholder="Illimité" min="1" />
-        </div>
-        <div class="form-group">
-          <label><i class="bi bi-people"></i> Max employés</label>
-          <input type="number" [(ngModel)]="form.maxEmployees" placeholder="Illimité" min="1" />
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label><i class="bi bi-hdd"></i> Max stockage (Mo)</label>
-        <input type="number" [(ngModel)]="form.maxStorageMb" placeholder="Illimité" min="1" />
-      </div>
-
-      <div class="form-section-title">
-        <i class="bi bi-grid-3x3-gap"></i> Modules activés
-      </div>
-      <div class="toggles-row">
-        <label class="toggle-label">
-          <input type="checkbox" [(ngModel)]="form.payrollEnabled" />
-          <i class="bi bi-cash-stack"></i> Paie
-        </label>
-        <label class="toggle-label">
-          <input type="checkbox" [(ngModel)]="form.rhEnabled" />
-          <i class="bi bi-people"></i> RH
-        </label>
-        <label class="toggle-label">
-          <input type="checkbox" [(ngModel)]="form.cnssEnabled" />
-          <i class="bi bi-shield-check"></i> CNSS
-        </label>
-        <label class="toggle-label">
-          <input type="checkbox" [(ngModel)]="form.taxEnabled" />
-          <i class="bi bi-percent"></i> Taxes
-        </label>
-        <label class="toggle-label">
-          <input type="checkbox" [(ngModel)]="form.damancomEnabled" />
-          <i class="bi bi-building"></i> Damancom
-        </label>
-      </div>
-
-      <div class="form-group">
-        <label><i class="bi bi-sticky"></i> Notes</label>
-        <textarea [(ngModel)]="form.notes" placeholder="Notes optionnelles..." rows="3"></textarea>
-      </div>
-    </div>
-
-    <div class="modal-footer">
-      <button class="btn btn-secondary" (click)="close()">
-        <i class="bi bi-x-circle"></i> Annuler
-      </button>
-      <button class="btn btn-primary" (click)="save()">
-        <i class="bi bi-check-circle"></i> {{ editing ? 'Enregistrer' : 'Créer' }}
-      </button>
     </div>
   </div>
 </div>
+
+<!-- Modal Backdrop -->
+<div class="modal-backdrop fade show" *ngIf="showModal"></div>
