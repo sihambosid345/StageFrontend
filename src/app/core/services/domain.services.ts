@@ -8,6 +8,50 @@ import {
   PayrollItem, Payslip, VariableItem, User
 } from '../models';
 
+// ─── Super Admin Service ──────────────────────────────────────────────────────
+// Toutes les opérations réservées au super admin passent par /super-admin/*
+@Injectable({ providedIn: 'root' })
+export class SuperAdminService {
+  constructor(private api: ApiService) {}
+
+  // Crée une entreprise + licence TRIAL automatiquement (transaction backend)
+  createCompanyWithLicense(data: Partial<Company>): Observable<{
+    message: string;
+    company: Company;
+    license: License;
+  }> {
+    return this.api.post('/super-admin/companies', data);
+  }
+
+  // Récupère toutes les entreprises (vue super admin avec licence et nb users)
+  getAllCompanies(): Observable<{ total: number; companies: any[] }> {
+    return this.api.get('/super-admin/companies');
+  }
+
+  // Crée ou met à jour la licence d'une entreprise
+  createOrUpdateLicense(data: Partial<License>): Observable<{ message: string; license: License }> {
+    return this.api.post('/super-admin/licenses', data);
+  }
+
+  // Crée un admin d'entreprise
+  createCompanyAdmin(data: {
+    companyId: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    password: string;
+    phone?: string;
+  }): Observable<{ message: string; user: User }> {
+    return this.api.post('/super-admin/company-admins', data);
+  }
+
+  // Récupère les utilisateurs d'une entreprise spécifique
+  getCompanyUsers(companyId: string): Observable<{ total: number; users: User[] }> {
+    return this.api.get(`/super-admin/companies/${companyId}/users`);
+  }
+}
+
+// ─── Company Service ───────────────────────────────────────────────────────────
 @Injectable({ providedIn: 'root' })
 export class CompanyService {
   constructor(private api: ApiService, private auth: AuthService) {}

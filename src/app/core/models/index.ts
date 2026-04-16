@@ -491,6 +491,25 @@ export interface CreateLicensePayload {
 }
 export type UpdateLicensePayload = Partial<Omit<CreateLicensePayload, 'companyId'>>;
 
+/** Ligne utilisateur pour POST /super-admin/companies/onboard (sans companyId) */
+export interface OnboardUserRow {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  phone?: string;
+  role: string;
+  status?: UserStatus;
+  permissions?: string[];
+}
+
+/** Création atomique : entreprise + licence + utilisateurs */
+export interface CreateCompanyOnboardPayload {
+  company: CreateCompanyPayload;
+  license: Omit<CreateLicensePayload, 'companyId'>;
+  users: OnboardUserRow[];
+}
+
 export interface AuditLog {
   id: string;
   companyId: string;

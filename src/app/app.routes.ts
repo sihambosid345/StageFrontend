@@ -23,6 +23,7 @@ export const routes: Routes = [
         loadComponent: () => import('./features/dashboard/dashboard.component').then(m => m.DashboardComponent)
       },
       {
+        // Accessible au super admin (via guard 'companies') ET aux admins avec permission
         path: 'companies',
         canActivate: [permissionGuard('companies')],
         loadComponent: () => import('./features/companies/companies.component').then(m => m.CompaniesComponent)
@@ -53,6 +54,7 @@ export const routes: Routes = [
         loadComponent: () => import('./features/contracts/contracts.component').then(m => m.ContractsComponent)
       },
       {
+        // Licences : super admin seulement (guard vérifie isSuperAdmin)
         path: 'licenses',
         canActivate: [permissionGuard('licenses')],
         loadComponent: () => import('./features/licenses/licenses.component').then(m => m.LicensesComponent)
