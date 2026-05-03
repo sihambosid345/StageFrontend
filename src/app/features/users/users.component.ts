@@ -1,9 +1,10 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { UserService, CompanyService } from '../../core/services/domain.services';
 import { AuthService } from '../../core/services/auth.service';
+import { ToastService } from '../../core/services/toast.service';
 import { Company } from '../../core/models';
 
 export const PERMISSIONS = [
@@ -77,19 +78,22 @@ export class UsersComponent implements OnInit {
     private service: UserService,
     private companyService: CompanyService,
     public auth: AuthService,
-    private route: ActivatedRoute
+    private route: ActivatedRoute,
+    private toastService: ToastService,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit() {
     this.load();
+    this.loadCompanies();
     
-    // Debug for permissions
-    console.log('Current User:', this.auth.currentUser());
-    console.log('Is Admin:', this.isAdmin());
+    // Auto-refresh every 30 seconds
+    setInterval(() => {
+      if (!this.showModal && !this.showFilterPanel) {
+        this.load();
+      }
+    }, 30000);
 
-    if (this.auth.isSuperAdmin()) {
-      this.companyService.getAll().subscribe({ next: (data) => this.companies = data });
-    }
     this.route.queryParamMap.subscribe(params => {
       const companyId = params.get('companyId');
       if (companyId) {
@@ -106,6 +110,7 @@ export class UsersComponent implements OnInit {
               ...user,
               permissions
             });
+            this.cdr.detectChanges();
           },
           error: () => {}
         });
@@ -113,18 +118,45 @@ export class UsersComponent implements OnInit {
     });
   }
 
+  loadCompanies() {
+    if (this.auth.isSuperAdmin()) {
+      this.companyService.getAll().subscribe({ 
+        next: (data) => { 
+          this.companies = data || []; 
+          this.cdr.detectChanges();
+        },
+        error: (err) => {
+          console.error('Error loading companies:', err);
+          this.cdr.detectChanges();
+        }
+      });
+    } else {
+      const companyId = this.auth.currentUser()?.companyId;
+      if (companyId) {
+        this.companyService.getById(companyId).subscribe({
+          next: (data) => {
+            this.companies = data ? [data] : [];
+            this.cdr.detectChanges();
+          },
+          error: () => {
+            this.companies = [];
+            this.cdr.detectChanges();
+          }
+        });
+      }
+    }
+  }
+
   emptyForm() {
     return { firstName: '', lastName: '', email: '', phone: '', role: '', password: '', permissions: [], status: 'ACTIVE' };
   }
 
-  // Modified logic to ensure SUPER_ADMIN is always treated as Admin
   isAdmin(): boolean {
     const user = this.auth.currentUser();
     const role = user?.role;
     return role === 'ADMIN' || role === 'SUPER_ADMIN' || this.auth.isSuperAdmin();
   }
 
-  // Function called by *ngIf in HTML
   canManageUsers(): boolean {
     return this.isAdmin();
   }
@@ -132,17 +164,22 @@ export class UsersComponent implements OnInit {
   load() {
     this.loading = true;
     this.error = '';
+    console.log('🔄 Loading users...');
+    
     this.service.getAll().subscribe({
       next: (data) => { 
-        this.items = data; 
+        console.log('✅ Users loaded:', data?.length || 0);
+        this.items = data || []; 
         this.applySearch(); 
-        this.loading = false; 
-        console.log('Users loaded:', data);
+        this.loading = false;
+        this.cdr.detectChanges();
       },
       error: (err) => { 
         this.loading = false;
         this.error = err?.error?.error || err?.message || 'Erreur lors du chargement des utilisateurs';
-        console.error('Error loading users:', err);
+        console.error('❌ Error loading users:', err);
+        this.cdr.detectChanges();
+        this.toastService?.error(this.error);
       }
     });
   }
@@ -160,9 +197,13 @@ export class UsersComponent implements OnInit {
       const matchesStatus = this.statusFilter ? item.status === this.statusFilter : true;
       return matchesSearch && matchesCompany && matchesRole && matchesStatus;
     });
+    console.log(`🔍 Filtered users: ${this.filtered.length} / ${this.items.length}`);
+    this.cdr.detectChanges();
   }
 
-  onSearch() { this.applySearch(); }
+  onSearch() { 
+    this.applySearch(); 
+  }
 
   openFilterPanel() {
     this.pendingCompanyFilterId = this.companyFilterId;
@@ -173,18 +214,34 @@ export class UsersComponent implements OnInit {
 
   closeFilterPanel() {
     this.showFilterPanel = false;
+    this.cdr.detectChanges();
   }
 
   togglePendingCompanySelection(companyId: string) {
     this.pendingCompanyFilterId = this.pendingCompanyFilterId === companyId ? '' : companyId;
+    this.cdr.detectChanges();
+  }
+
+  isPendingCompanySelected(companyId: string): boolean {
+    return this.pendingCompanyFilterId === companyId;
   }
 
   togglePendingRoleSelection(role: string) {
     this.pendingRoleFilter = this.pendingRoleFilter === role ? '' : role;
+    this.cdr.detectChanges();
+  }
+
+  isPendingRoleSelected(role: string): boolean {
+    return this.pendingRoleFilter === role;
   }
 
   togglePendingStatusSelection(status: string) {
     this.pendingStatusFilter = this.pendingStatusFilter === status ? '' : status;
+    this.cdr.detectChanges();
+  }
+
+  isPendingStatusSelected(status: string): boolean {
+    return this.pendingStatusFilter === status;
   }
 
   applyPendingFilters() {
@@ -193,31 +250,37 @@ export class UsersComponent implements OnInit {
     this.statusFilter = this.pendingStatusFilter;
     this.applySearch();
     this.showFilterPanel = false;
+    this.cdr.detectChanges();
   }
 
   resetPendingFilters() {
     this.pendingCompanyFilterId = '';
     this.pendingRoleFilter = '';
     this.pendingStatusFilter = '';
+    this.cdr.detectChanges();
   }
 
   clearCompanyFilter() {
     this.companyFilterId = '';
     this.applySearch();
+    this.cdr.detectChanges();
   }
 
   clearRoleFilter() {
     this.roleFilter = '';
     this.applySearch();
+    this.cdr.detectChanges();
   }
 
   clearStatusFilter() {
     this.statusFilter = '';
     this.applySearch();
+    this.cdr.detectChanges();
   }
 
   companyName(companyId: string): string {
-    return this.companies.find(c => c.id === companyId)?.name || '—';
+    const company = this.companies.find(c => c.id === companyId);
+    return company?.name || '—';
   }
 
   openCreate() {
@@ -233,6 +296,7 @@ export class UsersComponent implements OnInit {
     this.error = '';
     this.showPassword = false;
     this.showModal = true;
+    this.cdr.detectChanges();
   }
 
   openEdit(item: any) {
@@ -252,6 +316,7 @@ export class UsersComponent implements OnInit {
     this.error = '';
     this.showPassword = false;
     this.showModal = true;
+    this.cdr.detectChanges();
   }
 
   get visibleRoles(): string[] {
@@ -268,6 +333,7 @@ export class UsersComponent implements OnInit {
     if (this.form.role === 'SUPER_ADMIN') {
       this.form.companyId = undefined;
     }
+    this.cdr.detectChanges();
   }
 
   isPermChecked(key: string): boolean {
@@ -281,6 +347,7 @@ export class UsersComponent implements OnInit {
     } else {
       this.form.permissions.push(key);
     }
+    this.cdr.detectChanges();
   }
 
   generatePassword(strength: 'basic' | 'strong') {
@@ -296,17 +363,22 @@ export class UsersComponent implements OnInit {
     }
     this.form.password = pw;
     this.showPassword = true;
+    this.cdr.detectChanges();
   }
 
   save() {
     if (!this.form.firstName || !this.form.lastName || !this.form.email || !this.form.role) {
       this.error = 'Veuillez remplir tous les champs obligatoires.';
+      this.cdr.detectChanges();
       return;
     }
     if (!this.editing && !this.form.password) {
       this.error = 'Le mot de passe est obligatoire.';
+      this.cdr.detectChanges();
       return;
     }
+
+    const loadingId = this.toastService?.loading('Sauvegarde en cours...');
 
     const payload: any = {
       firstName:   this.form.firstName,
@@ -330,6 +402,7 @@ export class UsersComponent implements OnInit {
 
     if (this.auth.isSuperAdmin() && this.form.role !== 'SUPER_ADMIN' && !payload.companyId) {
       this.error = 'Le super admin doit choisir une entreprise pour le nouvel utilisateur.';
+      this.cdr.detectChanges();
       return;
     }
 
@@ -341,24 +414,49 @@ export class UsersComponent implements OnInit {
       next: () => {
         this.showModal = false;
         this.load();
-        this.showToast(this.editing
-          ? `Utilisateur ${this.form.firstName} mis à jour.`
-          : `Utilisateur ${this.form.firstName} ${this.form.lastName} créé avec succès !`
-        );
+        this.cdr.detectChanges();
+        if (this.toastService) {
+          this.toastService.update(loadingId, this.editing
+            ? `Utilisateur ${this.form.firstName} mis à jour avec succès`
+            : `Utilisateur ${this.form.firstName} ${this.form.lastName} créé avec succès`, 'success', 4000);
+        } else {
+          this.showToast(this.editing
+            ? `Utilisateur ${this.form.firstName} mis à jour.`
+            : `Utilisateur ${this.form.firstName} ${this.form.lastName} créé avec succès !`
+          );
+        }
       },
-      error: (e) => { this.error = e?.error?.error || 'Erreur lors de l\'enregistrement.'; }
+      error: (e) => { 
+        this.error = e?.error?.error || 'Erreur lors de l\'enregistrement.';
+        this.cdr.detectChanges();
+        if (this.toastService) {
+          this.toastService.update(loadingId, this.error, 'error', 4000);
+        }
+      }
     });
   }
 
   delete(item: any) {
     if (!confirm(`Supprimer ${item.firstName} ${item.lastName} ?`)) return;
+    
     this.service.delete(item.id).subscribe({
-      next: () => { this.load(); this.showToast('Utilisateur supprimé.'); },
-      error: (e) => alert(e?.error?.error || 'Erreur lors de la suppression.')
+      next: () => { 
+        this.load(); 
+        this.cdr.detectChanges();
+        this.toastService?.success('Utilisateur supprimé avec succès');
+        this.showToast('Utilisateur supprimé.');
+      },
+      error: (e) => {
+        this.toastService?.error(e?.error?.error || 'Erreur lors de la suppression');
+        alert(e?.error?.error || 'Erreur lors de la suppression.');
+      }
     });
   }
 
-  close() { this.showModal = false; }
+  close() { 
+    this.showModal = false; 
+    this.cdr.detectChanges();
+  }
 
   showToast(msg: string) {
     this.toast = msg;
@@ -405,7 +503,8 @@ export class UsersComponent implements OnInit {
   get currentCompanyName(): string {
     const companyId = this.auth.currentUser()?.companyId;
     if (!companyId) return 'Entreprise assignée automatiquement';
-    return this.companies.find(c => c.id === companyId)?.name ?? 'Entreprise assignée automatiquement';
+    const company = this.companies.find(c => c.id === companyId);
+    return company?.name ?? 'Entreprise assignée automatiquement';
   }
 
   getInitials(item: any): string {
