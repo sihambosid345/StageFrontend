@@ -27,6 +27,13 @@ export class PositionsComponent implements OnInit {
   editing   = false;
   editingId = '';
   search    = '';
+  companyFilterId = '';
+  departmentFilterId = '';
+  activityFilter = '';
+  pendingCompanyId = '';
+  pendingDepartmentId = '';
+  pendingActivity = '';
+  showFilterPanel = false;
   errors: FormErrors = {};
 
   form: CreatePositionPayload = {
@@ -42,6 +49,11 @@ export class PositionsComponent implements OnInit {
   ) {}
 
   ngOnInit() {
+    this.loadData();
+  }
+  
+  loadData() {
+    this.loading = true;
     forkJoin({
       positions:   this.service.getAll(),
       companies:   this.companyService.getAll(),
@@ -53,22 +65,92 @@ export class PositionsComponent implements OnInit {
         this.companies   = d.companies;
         this.departments = d.departments;
         this.loading     = false;
+        this.applyFilters(); // ✅ Appliquer les filtres après chargement
       },
-      error: () => { this.loading = false; }
+      error: () => { 
+        this.loading = false; 
+      }
     });
   }
 
   load() {
     this.service.getAll().subscribe({
-      next: (data) => { this.items = data; this.filtered = data; },
+      next: (data) => { 
+        this.items = data; 
+        this.applyFilters(); 
+      },
     });
   }
 
   onSearch() {
+    this.applyFilters();
+  }
+
+  openFilterPanel() {
+    this.pendingCompanyId = this.companyFilterId;
+    this.pendingDepartmentId = this.departmentFilterId;
+    this.pendingActivity = this.activityFilter;
+    this.showFilterPanel = true;
+  }
+
+  closeFilterPanel() {
+    this.showFilterPanel = false;
+  }
+
+  selectPendingCompany(companyId: string) {
+    this.pendingCompanyId = this.pendingCompanyId === companyId ? '' : companyId;
+    if (this.pendingCompanyId !== companyId) {
+      this.pendingDepartmentId = '';
+    }
+  }
+
+  selectPendingDepartment(departmentId: string) {
+    this.pendingDepartmentId = this.pendingDepartmentId === departmentId ? '' : departmentId;
+  }
+
+  selectPendingActivity(activity: string) {
+    this.pendingActivity = this.pendingActivity === activity ? '' : activity;
+  }
+
+  applyPendingFilters() {
+    this.companyFilterId = this.pendingCompanyId;
+    this.departmentFilterId = this.pendingDepartmentId;
+    this.activityFilter = this.pendingActivity;
+    this.applyFilters();
+    this.showFilterPanel = false;
+  }
+
+  resetPendingFilters() {
+    this.pendingCompanyId = '';
+    this.pendingDepartmentId = '';
+    this.pendingActivity = '';
+  }
+
+  removeSelectedCompany() {
+    this.companyFilterId = '';
+    this.applyFilters();
+  }
+
+  removeSelectedDepartment() {
+    this.departmentFilterId = '';
+    this.applyFilters();
+  }
+
+  removeSelectedActivity() {
+    this.activityFilter = '';
+    this.applyFilters();
+  }
+
+  applyFilters() {
     const q = this.search.toLowerCase();
-    this.filtered = this.items.filter(i =>
-      `${i.name} ${i.code ?? ''} ${i.description ?? ''}`.toLowerCase().includes(q)
-    );
+    this.filtered = this.items.filter(i => {
+      const matchesSearch = `${i.name} ${i.code ?? ''} ${i.description ?? ''}`
+        .toLowerCase().includes(q);
+      const matchesCompany = this.companyFilterId ? i.companyId === this.companyFilterId : true;
+      const matchesDepartment = this.departmentFilterId ? i.departmentId === this.departmentFilterId : true;
+      const matchesActivity = this.activityFilter ? String(i.isActive) === this.activityFilter : true;
+      return matchesSearch && matchesCompany && matchesDepartment && matchesActivity;
+    });
   }
 
   get isSuperAdmin(): boolean {
@@ -122,8 +204,13 @@ export class PositionsComponent implements OnInit {
       : this.service.create(payload);
 
     obs.subscribe({
-      next: () => { this.showModal = false; this.load(); },
-      error: (e) => { this.errors['api'] = e?.error?.error || 'Erreur serveur'; }
+      next: () => { 
+        this.showModal = false; 
+        this.load(); 
+      },
+      error: (e) => { 
+        this.errors['api'] = e?.error?.error || 'Erreur serveur'; 
+      }
     });
   }
 
@@ -134,15 +221,27 @@ export class PositionsComponent implements OnInit {
 
   /** Départements filtrés selon la company sélectionnée dans le formulaire */
   get filteredDepts(): Department[] {
-    if (!this.form.companyId) return this.departments;
+    if (!this.form.companyId) return [];
     return this.departments.filter(d => d.companyId === this.form.companyId);
   }
 
-  /** Réinitialise le département si on change d'entreprise */
-  onCompanyChange() { this.form.departmentId = ''; }
+  get filterDepartments(): Department[] {
+    if (!this.pendingCompanyId) return this.departments;
+    return this.departments.filter(d => d.companyId === this.pendingCompanyId);
+  }
 
-  companyName(id: string)    { return this.companies.find(c => c.id === id)?.name    ?? id; }
-  departmentName(id: string) { return this.departments.find(d => d.id === id)?.name  ?? '—'; }
+  /** Réinitialise le département si on change d'entreprise */
+  onCompanyChange() { 
+    this.form.departmentId = ''; 
+  }
+
+  companyName(id: string)    { 
+    return this.companies.find(c => c.id === id)?.name ?? id; 
+  }
+  
+  departmentName(id: string) { 
+    return this.departments.find(d => d.id === id)?.name ?? '—'; 
+  }
 
   close()             { this.showModal = false; }
   hasError(f: string) { return !!this.errors[f]; }

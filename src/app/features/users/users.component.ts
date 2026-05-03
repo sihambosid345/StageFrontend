@@ -1,21 +1,22 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { UserService, CompanyService } from '../../core/services/domain.services';
 import { AuthService } from '../../core/services/auth.service';
 import { Company } from '../../core/models';
 
 export const PERMISSIONS = [
-  { key: 'dashboard',     label: 'Tableau de bord',    icon: 'bi-grid-1x2' },
-  { key: 'employees',     label: 'Employés',            icon: 'bi-people' },
-  { key: 'payroll',       label: 'Paie',                icon: 'bi-cash-stack' },
-  { key: 'organisation',  label: 'Organisation',        icon: 'bi-building' },
-  { key: 'companies',     label: 'Entreprises',         icon: 'bi-buildings' },
-  { key: 'attendance',    label: 'Présences',           icon: 'bi-calendar-check' },
-  { key: 'contracts',     label: 'Contrats',            icon: 'bi-file-earmark-text' },
-  { key: 'reports',       label: 'Rapports CNSS',       icon: 'bi-file-bar-graph' },
-  { key: 'licenses',      label: 'Licences',            icon: 'bi-shield-check' },
-  { key: 'users',         label: 'Utilisateurs',        icon: 'bi-person-gear' },
+  { key: 'dashboard',     label: 'Tableau de bord',     icon: 'bi-grid-1x2' },
+  { key: 'employees',     label: 'Employés',             icon: 'bi-people' },
+  { key: 'payroll',       label: 'Paie',                 icon: 'bi-cash-stack' },
+  { key: 'organisation',  label: 'Organisation',         icon: 'bi-building' },
+  { key: 'companies',     label: 'Entreprises',          icon: 'bi-buildings' },
+  { key: 'attendance',    label: 'Présences',            icon: 'bi-calendar-check' },
+  { key: 'contracts',     label: 'Contrats',             icon: 'bi-file-earmark-text' },
+  { key: 'reports',       label: 'Rapports CNSS',        icon: 'bi-file-bar-graph' },
+  { key: 'licenses',      label: 'Licences',             icon: 'bi-shield-check' },
+  { key: 'users',         label: 'Utilisateurs',         icon: 'bi-person-gear' },
 ];
 
 export const ROLE_PRESETS: Record<string, string[]> = {
@@ -47,8 +48,16 @@ export class UsersComponent implements OnInit {
   editing = false;
   editingId = '';
   search = '';
+  companyFilterId = '';
+  roleFilter = '';
+  statusFilter = '';
+  showFilterPanel = false;
+  pendingCompanyFilterId = '';
+  pendingRoleFilter = '';
+  pendingStatusFilter = '';
   error = '';
   showPassword = false;
+  queryCompanyId = '';
   toast = '';
   toastTimer: any;
 
@@ -67,24 +76,55 @@ export class UsersComponent implements OnInit {
   constructor(
     private service: UserService,
     private companyService: CompanyService,
-    public auth: AuthService
+    public auth: AuthService,
+    private route: ActivatedRoute
   ) {}
 
   ngOnInit() {
     this.load();
+    
+    // Debug for permissions
+    console.log('Current User:', this.auth.currentUser());
+    console.log('Is Admin:', this.isAdmin());
+
     if (this.auth.isSuperAdmin()) {
       this.companyService.getAll().subscribe({ next: (data) => this.companies = data });
     }
+    this.route.queryParamMap.subscribe(params => {
+      const companyId = params.get('companyId');
+      if (companyId) {
+        this.queryCompanyId = companyId;
+        this.openCreate();
+      }
+
+      const editUserId = params.get('userId');
+      if (editUserId) {
+        this.service.getById(editUserId).subscribe({
+          next: (user) => {
+            const permissions = Array.isArray((user as any).permissions) ? [...(user as any).permissions] : [];
+            this.openEdit({
+              ...user,
+              permissions
+            });
+          },
+          error: () => {}
+        });
+      }
+    });
   }
 
   emptyForm() {
     return { firstName: '', lastName: '', email: '', phone: '', role: '', password: '', permissions: [], status: 'ACTIVE' };
   }
 
+  // Modified logic to ensure SUPER_ADMIN is always treated as Admin
   isAdmin(): boolean {
-    return this.auth.currentUser()?.role === 'ADMIN' || this.auth.isSuperAdmin();
+    const user = this.auth.currentUser();
+    const role = user?.role;
+    return role === 'ADMIN' || role === 'SUPER_ADMIN' || this.auth.isSuperAdmin();
   }
 
+  // Function called by *ngIf in HTML
   canManageUsers(): boolean {
     return this.isAdmin();
   }
@@ -109,19 +149,82 @@ export class UsersComponent implements OnInit {
 
   applySearch() {
     const q = this.search.toLowerCase();
-    this.filtered = q
-      ? this.items.filter(i =>
-          `${i.firstName} ${i.lastName}`.toLowerCase().includes(q) ||
-          i.email?.toLowerCase().includes(q) ||
-          i.role?.toLowerCase().includes(q)
-        )
-      : [...this.items];
+    this.filtered = this.items.filter(item => {
+      const companyId = item.company?.id || item.companyId || '';
+      const matchesSearch = q
+        ? `${item.firstName} ${item.lastName} ${item.email ?? ''} ${item.role ?? ''}`
+            .toLowerCase().includes(q)
+        : true;
+      const matchesCompany = this.companyFilterId ? companyId === this.companyFilterId : true;
+      const matchesRole = this.roleFilter ? item.role === this.roleFilter : true;
+      const matchesStatus = this.statusFilter ? item.status === this.statusFilter : true;
+      return matchesSearch && matchesCompany && matchesRole && matchesStatus;
+    });
   }
 
   onSearch() { this.applySearch(); }
 
+  openFilterPanel() {
+    this.pendingCompanyFilterId = this.companyFilterId;
+    this.pendingRoleFilter = this.roleFilter;
+    this.pendingStatusFilter = this.statusFilter;
+    this.showFilterPanel = true;
+  }
+
+  closeFilterPanel() {
+    this.showFilterPanel = false;
+  }
+
+  togglePendingCompanySelection(companyId: string) {
+    this.pendingCompanyFilterId = this.pendingCompanyFilterId === companyId ? '' : companyId;
+  }
+
+  togglePendingRoleSelection(role: string) {
+    this.pendingRoleFilter = this.pendingRoleFilter === role ? '' : role;
+  }
+
+  togglePendingStatusSelection(status: string) {
+    this.pendingStatusFilter = this.pendingStatusFilter === status ? '' : status;
+  }
+
+  applyPendingFilters() {
+    this.companyFilterId = this.pendingCompanyFilterId;
+    this.roleFilter = this.pendingRoleFilter;
+    this.statusFilter = this.pendingStatusFilter;
+    this.applySearch();
+    this.showFilterPanel = false;
+  }
+
+  resetPendingFilters() {
+    this.pendingCompanyFilterId = '';
+    this.pendingRoleFilter = '';
+    this.pendingStatusFilter = '';
+  }
+
+  clearCompanyFilter() {
+    this.companyFilterId = '';
+    this.applySearch();
+  }
+
+  clearRoleFilter() {
+    this.roleFilter = '';
+    this.applySearch();
+  }
+
+  clearStatusFilter() {
+    this.statusFilter = '';
+    this.applySearch();
+  }
+
+  companyName(companyId: string): string {
+    return this.companies.find(c => c.id === companyId)?.name || '—';
+  }
+
   openCreate() {
     this.form = this.emptyForm();
+    if (this.queryCompanyId && this.auth.isSuperAdmin()) {
+      this.form.companyId = this.queryCompanyId;
+    }
     if (!this.auth.isSuperAdmin()) {
       this.form.companyId = this.auth.currentUser()?.companyId ?? '';
     }
@@ -217,12 +320,10 @@ export class UsersComponent implements OnInit {
     };
     if (this.form.password) payload.password = this.form.password;
 
-    // For non-super-admin users, force companyId to the current user's company
     if (!this.auth.isSuperAdmin()) {
       payload.companyId = this.auth.currentUser()?.companyId;
     }
 
-    // Super admin users creating or editing SUPER_ADMIN accounts do not need a companyId
     if (this.auth.isSuperAdmin() && this.form.role === 'SUPER_ADMIN') {
       delete payload.companyId;
     }
@@ -267,10 +368,38 @@ export class UsersComponent implements OnInit {
 
   roleBadgeClass(role: string): string {
     const map: Record<string, string> = {
-      ADMIN: 'badge-admin', RH: 'badge-rh',
-      MANAGER: 'badge-manager', VIEWER: 'badge-viewer', CUSTOM: 'badge-custom'
+      SUPER_ADMIN: 'badge-super-admin',
+      ADMIN: 'badge-admin',
+      HR_MANAGER: 'badge-hr',
+      PAYROLL_MANAGER: 'badge-payroll',
+      EMPLOYEE: 'badge-employee',
+      VIEWER: 'badge-viewer',
     };
     return map[role] ?? 'badge-custom';
+  }
+
+  roleLabel(role: string): string {
+    const labels: Record<string, string> = {
+      SUPER_ADMIN: 'Super admin',
+      ADMIN: 'Admin',
+      HR_MANAGER: 'RH',
+      PAYROLL_MANAGER: 'Paie',
+      EMPLOYEE: 'Employé',
+      VIEWER: 'Lecteur',
+    };
+    return (labels[role] ?? role) || '—';
+  }
+
+  roleIcon(role: string): string {
+    const icons: Record<string, string> = {
+      SUPER_ADMIN: 'bi-shield-lock',
+      ADMIN: 'bi-person-badge',
+      HR_MANAGER: 'bi-people',
+      PAYROLL_MANAGER: 'bi-cash-stack',
+      EMPLOYEE: 'bi-person',
+      VIEWER: 'bi-eye',
+    };
+    return icons[role] ?? 'bi-person-fill';
   }
 
   get currentCompanyName(): string {

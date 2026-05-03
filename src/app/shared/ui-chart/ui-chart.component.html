@@ -1,0 +1,51 @@
+<article class="ui-chart-card">
+  <div class="ui-chart-head">
+    <div>
+      <h3>{{ title }}</h3>
+      <p *ngIf="subtitle">{{ subtitle }}</p>
+    </div>
+    <div class="ui-chart-total" *ngIf="hasData()">
+      {{ total() }}
+    </div>
+  </div>
+
+  <ng-container *ngIf="hasData(); else emptyState">
+    
+    <!-- Donut Chart -->
+    <div class="chart-body" *ngIf="type === 'donut'">
+      <ngx-charts-advanced-pie-chart
+        [view]="[400, 400]"
+        [results]="advancedPieResults()"
+        [scheme]="colorScheme"
+        [animations]="true"
+        [gradient]="false"
+        (select)="onSelect($event)">
+      </ngx-charts-advanced-pie-chart>
+    </div>
+
+    <!-- Bar Chart - Version simplifiée -->
+    <div class="chart-body" *ngIf="type === 'bar'">
+      <ngx-charts-bar-vertical
+        [view]="[600, 400]"
+        [results]="chartResults()"
+        [scheme]="colorScheme"
+        [xAxis]="true"
+        [yAxis]="true"
+        [showXAxisLabel]="true"
+        [showYAxisLabel]="true"
+        [xAxisLabel]="'Catégories'"
+        [yAxisLabel]="'Nombre'"
+        [animations]="true"
+        (select)="onSelect($event)">
+      </ngx-charts-bar-vertical>
+    </div>
+
+  </ng-container>
+
+  <ng-template #emptyState>
+    <div class="ui-chart-empty">
+      <i class="bi bi-bar-chart-fill"></i>
+      <span>{{ emptyLabel }}</span>
+    </div>
+  </ng-template>
+</article>

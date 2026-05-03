@@ -12,14 +12,95 @@
 <div class="table-container">
   <div class="table-toolbar">
     <h2>Liste des postes ({{ filtered.length }})</h2>
-    <div class="search-input">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      <input type="text" placeholder="Rechercher..." [(ngModel)]="search" (input)="onSearch()" />
+    <div class="toolbar-actions">
+      <div class="search-input">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="text" placeholder="Rechercher..." [(ngModel)]="search" (input)="onSearch()" />
+      </div>
+      <div class="active-filters" *ngIf="companyFilterId || departmentFilterId || activityFilter">
+        <div class="filter-chips">
+          <span class="filter-chip" *ngIf="companyFilterId">
+            <i class="bi bi-building"></i>
+            {{ companies.find(c => c.id === companyFilterId)?.name }}
+            <button class="chip-remove" type="button" (click)="removeSelectedCompany()">
+              <i class="bi bi-x"></i>
+            </button>
+          </span>
+          <span class="filter-chip" *ngIf="departmentFilterId">
+            <i class="bi bi-diagram-3"></i>
+            {{ departmentName(departmentFilterId) }}
+            <button class="chip-remove" type="button" (click)="removeSelectedDepartment()">
+              <i class="bi bi-x"></i>
+            </button>
+          </span>
+          <span class="filter-chip" *ngIf="activityFilter">
+            <i class="bi bi-toggle-on"></i>
+            {{ activityFilter === 'true' ? 'Actif' : 'Inactif' }}
+            <button class="chip-remove" type="button" (click)="removeSelectedActivity()">
+              <i class="bi bi-x"></i>
+            </button>
+          </span>
+        </div>
+      </div>
+      <button class="btn-filter" *ngIf="isSuperAdmin" (click)="openFilterPanel()" [class.active]="showFilterPanel">
+        <i class="bi bi-funnel-fill"></i>
+        <span>Filtrer</span>
+        <span class="filter-badge" *ngIf="companyFilterId || departmentFilterId || activityFilter">
+          {{ (companyFilterId ? 1 : 0) + (departmentFilterId ? 1 : 0) + (activityFilter ? 1 : 0) }}
+        </span>
+      </button>
     </div>
   </div>
-
   <div *ngIf="loading" class="loading-spinner"></div>
 
+  <div class="filter-panel" *ngIf="isSuperAdmin && showFilterPanel">
+    <div class="filter-panel-header">
+      <h4>Filtres</h4>
+      <button class="close-btn" (click)="closeFilterPanel()"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="filter-panel-body">
+      <div class="filter-section">
+        <h5><i class="bi bi-building"></i> Entreprise</h5>
+        <div class="filter-options">
+          <button class="filter-option" *ngFor="let company of companies"
+                  [class.active]="pendingCompanyId === company.id"
+                  (click)="selectPendingCompany(company.id)">
+            <i class="bi" [ngClass]="pendingCompanyId === company.id ? 'bi-check-circle-fill' : 'bi-circle'"></i>
+            <span>{{ company.name }}</span>
+          </button>
+        </div>
+      </div>
+      <div class="filter-section">
+        <h5><i class="bi bi-diagram-3"></i> Département</h5>
+        <div class="filter-options">
+          <button class="filter-option" *ngFor="let department of filterDepartments"
+                  [class.active]="pendingDepartmentId === department.id"
+                  (click)="selectPendingDepartment(department.id)">
+            <i class="bi" [ngClass]="pendingDepartmentId === department.id ? 'bi-check-circle-fill' : 'bi-circle'"></i>
+            <span>{{ department.name }}</span>
+          </button>
+        </div>
+      </div>
+      <div class="filter-section">
+        <h5><i class="bi bi-toggle-on"></i> Statut</h5>
+        <div class="filter-options">
+          <button class="filter-option" [class.active]="pendingActivity === 'true'" (click)="selectPendingActivity('true')">
+            <i class="bi" [ngClass]="pendingActivity === 'true' ? 'bi-check-circle-fill' : 'bi-circle'"></i>
+            <span>Actif</span>
+          </button>
+          <button class="filter-option" [class.active]="pendingActivity === 'false'" (click)="selectPendingActivity('false')">
+            <i class="bi" [ngClass]="pendingActivity === 'false' ? 'bi-check-circle-fill' : 'bi-circle'"></i>
+            <span>Inactif</span>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="filter-panel-footer">
+      <button class="btn btn-secondary" type="button" (click)="resetPendingFilters()">Réinitialiser</button>
+      <button class="btn btn-primary" type="button" (click)="applyPendingFilters()">Appliquer</button>
+      <button class="btn btn-secondary" type="button" (click)="closeFilterPanel()">Fermer</button>
+    </div>
+  </div>
   <div class="table-scroll" *ngIf="!loading">
     <table *ngIf="filtered.length > 0">
       <thead>
@@ -66,32 +147,22 @@
         </tr>
       </tbody>
     </table>
-
-    <div class="empty-state" *ngIf="filtered.length === 0">
-      <div class="empty-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>
-      </div>
-      <h3>Aucun poste</h3>
-      <p>Commencez par en créer un.</p>
-    </div>
   </div>
 </div>
 
-<!-- ── Modal ─────────────────────────────────────────────────────────────── -->
 <div class="modal-overlay" *ngIf="showModal" (click)="close()">
-  <div class="modal" (click)="$event.stopPropagation()">
+  <div class="custom-modal" (click)="$event.stopPropagation()">
 
     <div class="modal-header">
       <h3>{{ editing ? 'Modifier' : 'Nouveau' }} poste</h3>
-      <button class="btn btn-icon btn-secondary" (click)="close()">
-        <svg viewBox="0 0 20 20" fill="currentColor" width="16"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+      <button class="close-btn" (click)="close()">
+        <svg viewBox="0 0 20 20" fill="currentColor" width="20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
       </button>
     </div>
 
     <div class="modal-body">
       <div class="api-error" *ngIf="errors['api']">{{ errors['api'] }}</div>
 
-      <!-- Entreprise -->
       <div class="form-group" [class.has-error]="hasError('companyId')">
         <label>Entreprise <span class="required">*</span></label>
         <ng-container *ngIf="isSuperAdmin; else fixedCompany">
@@ -101,22 +172,20 @@
           </select>
         </ng-container>
         <ng-template #fixedCompany>
-          <div class="readonly-field">{{ currentCompanyName }}</div>
+          <div class="readonly-field-box">{{ currentCompanyName }}</div>
         </ng-template>
         <span class="field-error" *ngIf="hasError('companyId')">{{ errors['companyId'] }}</span>
       </div>
 
-      <!-- Département (filtré par entreprise) -->
       <div class="form-group">
         <label>Département</label>
         <select [(ngModel)]="form.departmentId" [disabled]="!form.companyId">
           <option value="">— Aucun département —</option>
           <option *ngFor="let d of filteredDepts" [value]="d.id">{{ d.name }}</option>
         </select>
-        <span class="hint" *ngIf="!form.companyId">Sélectionnez d'abord une entreprise</span>
+        <span class="hint-text" *ngIf="!form.companyId">⚠️ Sélectionnez d'abord une entreprise</span>
       </div>
 
-      <!-- Nom + Code -->
       <div class="form-row">
         <div class="form-group" [class.has-error]="hasError('name')">
           <label>Nom du poste <span class="required">*</span></label>
@@ -129,13 +198,11 @@
         </div>
       </div>
 
-      <!-- Description -->
       <div class="form-group">
         <label>Description</label>
-        <textarea [(ngModel)]="form.description" placeholder="Description du poste..."></textarea>
+        <textarea [(ngModel)]="form.description" rows="3" placeholder="Description du poste..."></textarea>
       </div>
 
-      <!-- Statut -->
       <div class="form-group">
         <label>Statut</label>
         <select [(ngModel)]="form.isActive">
@@ -143,7 +210,6 @@
           <option [ngValue]="false">Inactif</option>
         </select>
       </div>
-
     </div>
 
     <div class="modal-footer">

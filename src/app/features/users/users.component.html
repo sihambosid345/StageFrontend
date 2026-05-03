@@ -17,10 +17,39 @@
 
 <div class="table-container">
   <div class="table-toolbar">
-    <h2>Liste des utilisateurs</h2>
-    <div class="search-input">
-      <i class="bi bi-search"></i>
-      <input type="text" placeholder="Rechercher par nom, email ou rôle..." [(ngModel)]="search" (input)="onSearch()" />
+    <div class="toolbar-heading">
+      <h2>Liste des utilisateurs</h2>
+      <p class="toolbar-subtitle">{{ filtered.length }} résultat{{ filtered.length > 1 ? 's' : '' }}</p>
+    </div>
+    <div class="toolbar-actions">
+      <div class="search-input">
+        <i class="bi bi-search"></i>
+        <input type="text" placeholder="Rechercher par nom, email ou rôle..." [(ngModel)]="search" (input)="onSearch()" />
+      </div>
+      <div class="active-filters" *ngIf="companyFilterId || roleFilter || statusFilter">
+        <span class="filter-chip" *ngIf="companyFilterId">
+          <i class="bi bi-building"></i>
+          {{ companyName(companyFilterId) }}
+          <button type="button" class="chip-remove" (click)="clearCompanyFilter()"><i class="bi bi-x"></i></button>
+        </span>
+        <span class="filter-chip" *ngIf="roleFilter">
+          <i class="bi bi-person-badge"></i>
+          {{ roleLabel(roleFilter) }}
+          <button type="button" class="chip-remove" (click)="clearRoleFilter()"><i class="bi bi-x"></i></button>
+        </span>
+        <span class="filter-chip" *ngIf="statusFilter">
+          <i class="bi bi-list-task"></i>
+          {{ statusFilter }}
+          <button type="button" class="chip-remove" (click)="clearStatusFilter()"><i class="bi bi-x"></i></button>
+        </span>
+      </div>
+      <button class="btn-filter" type="button" (click)="openFilterPanel()" [class.active]="showFilterPanel">
+        <i class="bi bi-funnel-fill"></i>
+        <span>Filtrer</span>
+        <span class="filter-badge" *ngIf="companyFilterId || roleFilter || statusFilter">
+          {{ (companyFilterId ? 1 : 0) + (roleFilter ? 1 : 0) + (statusFilter ? 1 : 0) }}
+        </span>
+      </button>
     </div>
   </div>
 
@@ -36,6 +65,7 @@
         <tr>
           <th>Utilisateur</th>
           <th>Email</th>
+          <th>Entreprise</th>
           <th>Rôle</th>
           <th>Permissions</th>
           <th>Statut</th>
@@ -52,7 +82,13 @@
           </td>
           <td class="text-muted">{{ item.email }}</td>
           <td>
-            <span class="badge" [ngClass]="roleBadgeClass(item.role)">{{ item.role }}</span>
+            <span class="company-badge">{{ item.company?.name || '—' }}</span>
+          </td>
+          <td>
+            <span class="badge role-badge" [ngClass]="roleBadgeClass(item.role)">
+              <i class="bi" [ngClass]="roleIcon(item.role)"></i>
+              {{ roleLabel(item.role) }}
+            </span>
           </td>
           <td>
             <div class="perm-pills">
@@ -100,6 +136,58 @@
       <h3>Aucun résultat</h3>
       <p>Aucun utilisateur trouvé. Commencez par en ajouter un.</p>
     </div>
+  </div>
+</div>
+
+<div class="filter-panel" *ngIf="showFilterPanel">
+  <div class="filter-panel-header">
+    <div>
+      <h4>Filtres</h4>
+      <p>Affinez la liste avec plusieurs critères</p>
+    </div>
+    <button class="close-btn" type="button" (click)="closeFilterPanel()"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <div class="filter-panel-body">
+    <div class="filter-section" *ngIf="companies.length">
+      <h5><i class="bi bi-building"></i> Entreprise</h5>
+      <div class="filter-options">
+        <button type="button" class="filter-option" *ngFor="let company of companies" [class.active]="pendingCompanyFilterId === company.id" (click)="togglePendingCompanySelection(company.id)">
+          <i class="bi" [ngClass]="pendingCompanyFilterId === company.id ? 'bi-check-circle-fill' : 'bi-circle'"></i>
+          <span>{{ company.name }}</span>
+        </button>
+      </div>
+    </div>
+    <div class="filter-section">
+      <h5><i class="bi bi-person-badge"></i> Rôle</h5>
+      <div class="filter-options">
+        <button type="button" class="filter-option" *ngFor="let role of ROLES" [class.active]="pendingRoleFilter === role" (click)="togglePendingRoleSelection(role)">
+          <i class="bi" [ngClass]="pendingRoleFilter === role ? 'bi-check-circle-fill' : 'bi-circle'"></i>
+          <span>{{ roleLabel(role) }}</span>
+        </button>
+      </div>
+    </div>
+    <div class="filter-section">
+      <h5><i class="bi bi-list-task"></i> Statut</h5>
+      <div class="filter-options">
+        <button type="button" class="filter-option" [class.active]="pendingStatusFilter === 'ACTIVE'" (click)="togglePendingStatusSelection('ACTIVE')">
+          <i class="bi" [ngClass]="pendingStatusFilter === 'ACTIVE' ? 'bi-check-circle-fill' : 'bi-circle'"></i>
+          <span>Actif</span>
+        </button>
+        <button type="button" class="filter-option" [class.active]="pendingStatusFilter === 'INACTIVE'" (click)="togglePendingStatusSelection('INACTIVE')">
+          <i class="bi" [ngClass]="pendingStatusFilter === 'INACTIVE' ? 'bi-check-circle-fill' : 'bi-circle'"></i>
+          <span>Inactif</span>
+        </button>
+        <button type="button" class="filter-option" [class.active]="pendingStatusFilter === 'BLOCKED'" (click)="togglePendingStatusSelection('BLOCKED')">
+          <i class="bi" [ngClass]="pendingStatusFilter === 'BLOCKED' ? 'bi-check-circle-fill' : 'bi-circle'"></i>
+          <span>Bloqué</span>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="filter-panel-footer">
+    <button class="btn btn-secondary" type="button" (click)="resetPendingFilters()">Réinitialiser</button>
+    <button class="btn btn-primary" type="button" (click)="applyPendingFilters()">Appliquer</button>
+    <button class="btn btn-secondary" type="button" (click)="closeFilterPanel()">Fermer</button>
   </div>
 </div>
 
@@ -181,7 +269,7 @@
           <label>Rôle <span class="required">*</span></label>
           <select [(ngModel)]="form.role" (ngModelChange)="onRoleChange()">
             <option value="" disabled>-- Choisir un rôle --</option>
-            <option *ngFor="let r of ROLES" [value]="r">{{ r }}</option>
+            <option *ngFor="let r of visibleRoles" [value]="r">{{ r }}</option>
           </select>
         </div>
         <div class="form-group">
@@ -194,7 +282,7 @@
         </div>
       </div>
 
-      <div class="form-group" *ngIf="auth.isSuperAdmin()">
+      <div class="form-group" *ngIf="auth.isSuperAdmin() && form.role && form.role !== 'SUPER_ADMIN'">
         <label>Entreprise <span class="required">*</span></label>
         <select [(ngModel)]="form.companyId">
           <option value="" disabled>-- Choisir une entreprise --</option>
@@ -204,7 +292,7 @@
         </select>
       </div>
 
-      <div class="form-group" *ngIf="!auth.isSuperAdmin()">
+      <div class="form-group" *ngIf="!auth.isSuperAdmin() || form.role === 'SUPER_ADMIN'">
         <label>Entreprise</label>
         <div class="readonly-field">{{ currentCompanyName }}</div>
       </div>

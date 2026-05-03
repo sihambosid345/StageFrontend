@@ -76,6 +76,21 @@ export interface CreateCompanyPayload {
 }
 export type UpdateCompanyPayload = Partial<CreateCompanyPayload>;
 
+export interface CreateCompanyWithLicenseAndUsersPayload {
+  company: CreateCompanyPayload;
+  license: Omit<CreateLicensePayload, 'companyId'>;
+  users: Array<{
+    firstName: string;
+    lastName: string;
+    email: string;
+    password: string;
+    phone?: string;
+    role?: string;
+    status?: string;
+    permissions?: string[];
+  }>;
+}
+
 export interface User {
   id: string;
   companyId: string;
@@ -87,6 +102,7 @@ export interface User {
   phone?: string | null;
   role: string;
   status: UserStatus;
+  permissions?: string[];
   lastLoginAt?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -490,25 +506,6 @@ export interface CreateLicensePayload {
   notes?: string;
 }
 export type UpdateLicensePayload = Partial<Omit<CreateLicensePayload, 'companyId'>>;
-
-/** Ligne utilisateur pour POST /super-admin/companies/onboard (sans companyId) */
-export interface OnboardUserRow {
-  firstName: string;
-  lastName: string;
-  email: string;
-  password: string;
-  phone?: string;
-  role: string;
-  status?: UserStatus;
-  permissions?: string[];
-}
-
-/** Création atomique : entreprise + licence + utilisateurs */
-export interface CreateCompanyOnboardPayload {
-  company: CreateCompanyPayload;
-  license: Omit<CreateLicensePayload, 'companyId'>;
-  users: OnboardUserRow[];
-}
 
 export interface AuditLog {
   id: string;

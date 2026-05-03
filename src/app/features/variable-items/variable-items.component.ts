@@ -1,9 +1,9 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { VariableItemService, EmployeeService, PayrollPeriodService } from '../../core/services/domain.services';
+import { VariableItemService, EmployeeService, CompanyService } from '../../core/services/domain.services';
 import { AuthService } from '../../core/services/auth.service';
-import { VARIABLE_ITEM_TYPE_OPTIONS, VARIABLE_VALUE_TYPE_OPTIONS, VARIABLE_ITEM_STATUS_OPTIONS } from '../../core/models';
+import { VARIABLE_ITEM_TYPE_OPTIONS, VARIABLE_VALUE_TYPE_OPTIONS, VARIABLE_ITEM_STATUS_OPTIONS, Company } from '../../core/models';
 
 @Component({
   selector: 'app-variable-items',
@@ -16,12 +16,20 @@ export class VariableItemsComponent implements OnInit {
   items: any[] = [];
   filtered: any[] = [];
   employees: any[] = [];
+  companies: Company[] = [];
   periods: any[] = [];
   loading = true;
   showModal = false;
+  showFilterPanel = false;
   editing = false;
   editingId = '';
   search = '';
+  companyFilterId = '';
+  pendingCompanyFilterId = '';
+  typeFilter = '';
+  pendingTypeFilter = '';
+  statusFilter = '';
+  pendingStatusFilter = '';
   error = '';
 
   readonly typeOptions = VARIABLE_ITEM_TYPE_OPTIONS;
@@ -43,14 +51,16 @@ export class VariableItemsComponent implements OnInit {
   constructor(
     private service: VariableItemService,
     private employeeService: EmployeeService,
-    private periodService: PayrollPeriodService,
+    private companyService: CompanyService,
     private auth: AuthService
   ) {}
 
   ngOnInit() {
     this.load();
     this.employeeService.getAll().subscribe({ next: (d) => { this.employees = d; }, error: () => {} });
-    this.periodService.getAll().subscribe({ next: (d) => { this.periods = d; }, error: () => {} });
+    if (this.auth.isSuperAdmin()) {
+      this.loadCompanies();
+    }
   }
 
   load() {
@@ -61,23 +71,98 @@ export class VariableItemsComponent implements OnInit {
     });
   }
 
+  loadCompanies() {
+    this.companyService.getAll().subscribe({ next: (data) => { this.companies = data; } });
+  }
+
   applySearch() {
     const q = this.search.toLowerCase();
-    this.filtered = q
-      ? this.items.filter(i =>
-          this.getEmployeeName(i.employeeId).toLowerCase().includes(q) ||
+    this.filtered = this.items.filter(i => {
+      const matchesSearch = q
+        ? this.getEmployeeName(i.employeeId).toLowerCase().includes(q) ||
           i.type?.toLowerCase().includes(q) ||
           i.label?.toLowerCase().includes(q) ||
           i.status?.toLowerCase().includes(q)
-        )
-      : [...this.items];
+        : true;
+      const employee = this.employees.find(e => e.id === i.employeeId);
+      const matchesCompany = this.companyFilterId
+        ? employee?.companyId === this.companyFilterId
+        : true;
+      const matchesType = this.typeFilter
+        ? i.type === this.typeFilter
+        : true;
+      const matchesStatus = this.statusFilter
+        ? i.status === this.statusFilter
+        : true;
+      return matchesSearch && matchesCompany && matchesType && matchesStatus;
+    });
   }
 
   onSearch() { this.applySearch(); }
 
+  openFilterPanel() {
+    this.pendingCompanyFilterId = this.companyFilterId;
+    this.pendingTypeFilter = this.typeFilter;
+    this.pendingStatusFilter = this.statusFilter;
+    this.showFilterPanel = true;
+  }
+
+  closeFilterPanel() {
+    this.showFilterPanel = false;
+  }
+
+  togglePendingCompanySelection(companyId: string) {
+    this.pendingCompanyFilterId = this.pendingCompanyFilterId === companyId ? '' : companyId;
+  }
+
+  togglePendingTypeSelection(type: string) {
+    this.pendingTypeFilter = this.pendingTypeFilter === type ? '' : type;
+  }
+
+  togglePendingStatusSelection(status: string) {
+    this.pendingStatusFilter = this.pendingStatusFilter === status ? '' : status;
+  }
+
+  applyPendingFilters() {
+    this.companyFilterId = this.pendingCompanyFilterId;
+    this.typeFilter = this.pendingTypeFilter;
+    this.statusFilter = this.pendingStatusFilter;
+    this.showFilterPanel = false;
+    this.applySearch();
+  }
+
+  resetPendingFilters() {
+    this.pendingCompanyFilterId = '';
+    this.pendingTypeFilter = '';
+    this.pendingStatusFilter = '';
+  }
+
+  clearCompanyFilter() {
+    this.companyFilterId = '';
+    this.applySearch();
+  }
+
+  clearTypeFilter() {
+    this.typeFilter = '';
+    this.applySearch();
+  }
+
+  clearStatusFilter() {
+    this.statusFilter = '';
+    this.applySearch();
+  }
+
   getEmployeeName(id: string): string {
     const e = this.employees.find(e => e.id === id);
     return e ? `${e.firstName} ${e.lastName}` : id;
+  }
+
+  companyName(id: string): string {
+    return this.companies.find(c => c.id === id)?.name ?? '—';
+  }
+
+  get isSuperAdmin(): boolean {
+    return this.auth.isSuperAdmin();
   }
 
   getPeriodLabel(id: string): string {

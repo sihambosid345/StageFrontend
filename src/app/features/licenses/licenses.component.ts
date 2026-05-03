@@ -1,7 +1,8 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { LicenseService, CompanyService } from '../../core/services/domain.services';
+import { ActivatedRoute } from '@angular/router';
+import { LicenseService, CompanyService, SuperAdminService } from '../../core/services/domain.services';
 import { AuthService } from '../../core/services/auth.service';
 import {
   License, Company,
@@ -30,18 +31,26 @@ function validateRequired(form: any, fields: string[]): FormErrors {
   styleUrls: ['./licenses.component.scss']
 })
 export class LicensesComponent implements OnInit {
-  items: License[]   = [];
+  items: License[] = [];
   filtered: License[] = [];
-  companies: Company[] = [];   // ✅ liste des entreprises pour le dropdown
-  loading    = true;
-  showModal  = false;
-  editing    = false;
-  editingId  = '';
-  search     = '';
+  companies: Company[] = [];
+  loading = true;
+  showModal = false;
+  editing = false;
+  editingId = '';
+  search = '';
+  companyFilterId = '';
+  statusFilter = '';
+  planFilter = '';
+  showFilterPanel = false;
+  pendingCompanyId = '';
+  pendingStatus = '';
+  pendingPlan = '';
   errors: FormErrors = {};
+  queryCompanyId = '';
 
-  readonly planOptions    = LICENSE_PLAN_OPTIONS;
-  readonly statusOptions  = LICENSE_STATUS_OPTIONS;
+  readonly planOptions = LICENSE_PLAN_OPTIONS;
+  readonly statusOptions = LICENSE_STATUS_OPTIONS;
   readonly billingOptions = BILLING_CYCLE_OPTIONS;
 
   form: any = this.emptyForm();
@@ -49,15 +58,23 @@ export class LicensesComponent implements OnInit {
   constructor(
     private service: LicenseService,
     private companyService: CompanyService,
-    private auth: AuthService,
+    private superAdminService: SuperAdminService,
+    public auth: AuthService,
+    private route: ActivatedRoute,
   ) {}
 
   ngOnInit() {
     this.load();
     this.loadCompanies();
+    this.route.queryParamMap.subscribe(params => {
+      const companyId = params.get('companyId');
+      if (companyId) {
+        this.queryCompanyId = companyId;
+        this.openCreate();
+      }
+    });
   }
 
-  // ✅ charge les entreprises pour le select
   loadCompanies() {
     this.companyService.getAll().subscribe({
       next: (data) => { this.companies = data; },
@@ -65,7 +82,6 @@ export class LicensesComponent implements OnInit {
     });
   }
 
-  // ✅ helper — retourne le nom d'une entreprise par son id
   companyName(id: string): string {
     return this.companies.find(c => c.id === id)?.name ?? id;
   }
@@ -73,34 +89,139 @@ export class LicensesComponent implements OnInit {
   load() {
     this.loading = true;
     this.service.getAll().subscribe({
-      next: (data) => { this.items = data; this.filtered = data; this.loading = false; },
+      next: (data) => { 
+        this.items = this.updateExpiredLicenses(data); 
+        this.applyFilters(); 
+        this.loading = false; 
+      },
       error: () => { this.loading = false; }
     });
   }
 
+  /**
+   * Vérifie et met à jour le statut des licences expirées
+   */
+  private updateExpiredLicenses(licenses: License[]): License[] {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Début de la journée pour comparaison
+    
+    return licenses.map(license => {
+      // Si la licence a une date de fin et n'est pas déjà expirée
+      if (license.endsAt && license.status !== 'EXPIRED' && license.status !== 'CANCELLED') {
+        const endDate = new Date(license.endsAt);
+        endDate.setHours(0, 0, 0, 0); // Début de la journée pour comparaison
+        
+        // Si la date de fin est avant aujourd'hui
+        if (endDate < today) {
+          // Mettre à jour le statut côté backend
+          this.updateLicenseStatus(license.id, 'EXPIRED');
+          
+          // Retourner la licence avec le statut mis à jour pour l'affichage
+          return { ...license, status: 'EXPIRED' };
+        }
+      }
+      return license;
+    });
+  }
+
+  /**
+   * Met à jour le statut d'une licence dans la base de données
+   */
+  private updateLicenseStatus(licenseId: string, newStatus: LicenseStatus) {
+    this.service.update(licenseId, { status: newStatus }).subscribe({
+      next: () => {
+        console.log(`Licence ${licenseId} mise à jour: ${newStatus}`);
+      },
+      error: (err) => {
+        console.error(`Erreur lors de la mise à jour de la licence ${licenseId}:`, err);
+      }
+    });
+  }
+
   onSearch() {
+    this.applyFilters();
+  }
+
+  applyFilters() {
     const q = this.search.toLowerCase();
-    this.filtered = this.items.filter(i =>
-      `${this.companyName(i.companyId)} ${i.planCode} ${i.status} ${i.billingCycle}`
-        .toLowerCase().includes(q)
-    );
+    this.filtered = this.items.filter(i => {
+      const matchesSearch = `${this.companyName(i.companyId)} ${i.planCode} ${i.status} ${i.billingCycle}`
+        .toLowerCase().includes(q);
+      const matchesCompany = this.companyFilterId ? i.companyId === this.companyFilterId : true;
+      const matchesStatus = this.statusFilter ? i.status === this.statusFilter : true;
+      const matchesPlan = this.planFilter ? i.planCode === this.planFilter : true;
+      return matchesSearch && matchesCompany && matchesStatus && matchesPlan;
+    });
   }
 
-  get isSuperAdmin(): boolean {
-    return this.auth.isSuperAdmin();
+  clearCompanyFilter() {
+    this.companyFilterId = '';
+    this.applyFilters();
   }
 
-  get currentCompanyId(): string {
-    return this.auth.currentUser()?.companyId ?? '';
+  clearStatusFilter() {
+    this.statusFilter = '';
+    this.applyFilters();
   }
 
+  clearPlanFilter() {
+    this.planFilter = '';
+    this.applyFilters();
+  }
+
+  openFilterPanel() {
+    this.pendingCompanyId = this.companyFilterId;
+    this.pendingStatus = this.statusFilter;
+    this.pendingPlan = this.planFilter;
+    this.showFilterPanel = true;
+  }
+
+  closeFilterPanel() {
+    this.showFilterPanel = false;
+  }
+
+  togglePendingCompanySelection(companyId: string) {
+    this.pendingCompanyId = this.pendingCompanyId === companyId ? '' : companyId;
+  }
+
+  isPendingCompanySelected(companyId: string): boolean {
+    return this.pendingCompanyId === companyId;
+  }
+
+  togglePendingStatusSelection(status: LicenseStatus) {
+    this.pendingStatus = this.pendingStatus === status ? '' : status;
+  }
+
+  togglePendingPlanSelection(plan: LicensePlanCode) {
+    this.pendingPlan = this.pendingPlan === plan ? '' : plan;
+  }
+
+  applyPendingFilters() {
+    this.companyFilterId = this.pendingCompanyId;
+    this.statusFilter = this.pendingStatus;
+    this.planFilter = this.pendingPlan;
+    this.applyFilters();
+    this.showFilterPanel = false;
+  }
+
+  resetPendingFilters() {
+    this.pendingCompanyId = '';
+    this.pendingStatus = '';
+    this.pendingPlan = '';
+  }
+
+  get isSuperAdmin(): boolean { return this.auth.isSuperAdmin(); }
+  get currentCompanyId(): string { return this.auth.currentUser()?.companyId ?? ''; }
   get currentCompanyName(): string {
-    const companyId = this.currentCompanyId;
-    return this.companies.find(c => c.id === companyId)?.name ?? 'Entreprise assignée automatiquement';
+    const id = this.currentCompanyId;
+    return this.companies.find(c => c.id === id)?.name ?? 'Entreprise assignée automatiquement';
   }
 
   openCreate() {
     this.form = this.emptyForm();
+    if (this.queryCompanyId && this.isSuperAdmin) {
+      this.form.companyId = this.queryCompanyId;
+    }
     if (!this.isSuperAdmin) {
       this.form.companyId = this.currentCompanyId;
     }
@@ -115,10 +236,10 @@ export class LicensesComponent implements OnInit {
       status:          item.status,
       billingCycle:    item.billingCycle,
       startsAt:        item.startsAt?.slice(0, 10) ?? '',
-      endsAt:          item.endsAt?.slice(0, 10) ?? '',
-      maxUsers:        item.maxUsers ?? null,
-      maxEmployees:    item.maxEmployees ?? null,
-      maxStorageMb:    item.maxStorageMb ?? null,
+      endsAt:          item.endsAt?.slice(0, 10)   ?? '',
+      maxUsers:        item.maxUsers        ?? null,
+      maxEmployees:    item.maxEmployees    ?? null,
+      maxStorageMb:    item.maxStorageMb    ?? null,
       payrollEnabled:  item.payrollEnabled,
       rhEnabled:       item.rhEnabled,
       cnssEnabled:     item.cnssEnabled,
@@ -138,55 +259,50 @@ export class LicensesComponent implements OnInit {
     this.errors = validateRequired(this.form, ['companyId', 'planCode', 'startsAt']);
     if (Object.keys(this.errors).length) return;
 
-    const obs = this.editing
-      ? this.service.update(this.editingId, this.form)
-      : this.service.create(this.form);
+    const next = () => { 
+      this.showModal = false; 
+      this.load(); // Recharge avec vérification des licences expirées
+    };
+    const error = (e: any) => { this.errors['api'] = e?.error?.error || 'Erreur serveur'; };
 
-    obs.subscribe({
-      next: () => { this.showModal = false; this.load(); },
-      error: (e: any) => { this.errors['api'] = e?.error?.error || 'Erreur serveur'; }
-    });
+    if (this.editing) {
+      this.service.update(this.editingId, this.form).subscribe({ next, error });
+    } else {
+      this.superAdminService.createOrUpdateLicense(this.form).subscribe({ next, error });
+    }
   }
 
   delete(id: string) {
     if (!confirm('Supprimer cette licence ?')) return;
-    this.service.delete(id).subscribe(() => this.load());
+    this.service.delete(id).subscribe({ next: () => this.load() });
   }
 
-  close()              { this.showModal = false; }
-  hasError(f: string)  { return !!this.errors[f]; }
+  close() { this.showModal = false; }
+  hasError(f: string) { return !!this.errors[f]; }
 
-  // Helper methods for styling
   getPlanBadgeClass(planCode: string): string {
-    const classes: Record<string, string> = {
-      'BASIC': 'bg-secondary',
-      'PRO': 'bg-info',
-      'BUSINESS': 'bg-warning text-dark',
-      'ENTERPRISE': 'bg-danger'
+    const map: Record<string, string> = {
+      'BASIC': 'bg-secondary', 'PRO': 'bg-info',
+      'BUSINESS': 'bg-warning text-dark', 'ENTERPRISE': 'bg-danger'
     };
-    return classes[planCode] || 'bg-secondary';
+    return map[planCode] || 'bg-secondary';
   }
 
   getStatusBadgeClass(status: string): string {
-    const classes: Record<string, string> = {
-      'TRIAL': 'bg-warning text-dark',
-      'ACTIVE': 'bg-success',
-      'EXPIRED': 'bg-danger',
-      'SUSPENDED': 'bg-secondary',
-      'CANCELLED': 'bg-dark'
+    const map: Record<string, string> = {
+      'TRIAL': 'bg-warning text-dark', 'ACTIVE': 'bg-success',
+      'EXPIRED': 'bg-danger', 'SUSPENDED': 'bg-secondary', 'CANCELLED': 'bg-dark'
     };
-    return classes[status] || 'bg-secondary';
+    return map[status] || 'bg-secondary';
   }
 
   getStatusIcon(status: string): string {
-    const icons: Record<string, string> = {
-      'TRIAL': 'bi-clock',
-      'ACTIVE': 'bi-check-circle-fill',
-      'EXPIRED': 'bi-x-circle-fill',
-      'SUSPENDED': 'bi-pause-circle-fill',
+    const map: Record<string, string> = {
+      'TRIAL': 'bi-clock', 'ACTIVE': 'bi-check-circle-fill',
+      'EXPIRED': 'bi-x-circle-fill', 'SUSPENDED': 'bi-pause-circle-fill',
       'CANCELLED': 'bi-x-octagon-fill'
     };
-    return icons[status] || 'bi-question-circle';
+    return map[status] || 'bi-question-circle';
   }
 
   private emptyForm(): any {

@@ -45,15 +45,7 @@ export class SidebarComponent {
         { label: 'Éléments variables', icon: 'bi-sliders',                   route: '/variable-items', permission: 'contracts' },
       ]
     },
-    {
-      label: 'Paie', icon: 'bi-cash-stack', expanded: false,
-      children: [
-        { label: 'Périodes',       icon: 'bi-calendar3',                    route: '/payroll/periods',  permission: 'payroll' },
-        { label: 'Exécutions',     icon: 'bi-play-circle-fill',             route: '/payroll/runs',     permission: 'payroll' },
-        { label: 'Lignes de paie', icon: 'bi-list-columns',                 route: '/payroll/items',    permission: 'payroll' },
-        { label: 'Bulletins',      icon: 'bi-file-earmark-richtext-fill',   route: '/payroll/payslips', permission: 'payroll' },
-      ]
-    },
+   
     { label: 'Utilisateurs', icon: 'bi-person-gear-fill', route: '/users', permission: 'users' },
   ];
 
@@ -65,13 +57,13 @@ export class SidebarComponent {
   isVisible(item: NavItem): boolean {
     if (item.children) {
       return item.children.some(c => {
-        if (c.permission === 'licenses') {
+        if (c.permission === 'licenses' || c.permission === 'companies') {
           return this.auth.isSuperAdmin();
         }
         return this.auth.hasPermission(c.permission ?? '');
       });
     }
-    if (item.permission === 'licenses') {
+    if (item.permission === 'licenses' || item.permission === 'companies') {
       return this.auth.isSuperAdmin();
     }
     return this.auth.hasPermission(item.permission ?? '');
@@ -80,7 +72,7 @@ export class SidebarComponent {
   visibleChildren(item: NavItem): NavItem[] {
     if (!item.children) return [];
     return item.children.filter(c => {
-      if (c.permission === 'licenses') {
+      if (c.permission === 'licenses' || c.permission === 'companies') {
         return this.auth.isSuperAdmin();
       }
       return this.auth.hasPermission(c.permission ?? '');

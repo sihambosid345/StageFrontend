@@ -12,29 +12,49 @@
 <div class="table-container">
   <div class="table-toolbar">
     <h2>Liste des départements ({{ filtered.length }})</h2>
-    <div class="search-input">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      <input type="text" placeholder="Rechercher..." [(ngModel)]="search" (input)="onSearch()" />
+    <div class="toolbar-actions">
+      <div class="search-input">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="text" placeholder="Rechercher..." [(ngModel)]="search" (input)="onSearch()" />
+      </div>
+      <div class="active-filters" *ngIf="selectedCompanyId || activityFilter">
+        <div class="filter-chips">
+          <span class="filter-chip" *ngIf="selectedCompanyId">
+            <i class="bi bi-building"></i>
+            {{ companies.find(c => c.id === selectedCompanyId)?.name }}
+            <button class="chip-remove" (click)="removeSelectedCompany()" type="button"><i class="bi bi-x"></i></button>
+          </span>
+          <span class="filter-chip" *ngIf="activityFilter">
+            <i class="bi bi-toggle-on"></i>
+            {{ activityFilter === 'true' ? 'Actif' : 'Inactif' }}
+            <button class="chip-remove" (click)="clearActivityFilter()" type="button"><i class="bi bi-x"></i></button>
+          </span>
+        </div>
+      </div>
+      <button class="btn-filter" *ngIf="isSuperAdmin" (click)="openFilterPanel()" [class.active]="showFilterPanel">
+        <i class="bi bi-funnel-fill"></i>
+        <span>Filtrer</span>
+        <span class="filter-badge" *ngIf="selectedCompanyId || activityFilter">
+          {{ (selectedCompanyId ? 1 : 0) + (activityFilter ? 1 : 0) }}
+        </span>
+      </button>
     </div>
   </div>
 
-  <div *ngIf="loading" class="loading-spinner"></div>
-
-  <div class="table-scroll" *ngIf="!loading">
-    <table *ngIf="filtered.length > 0">
-      <thead>
-        <tr>
-          <th>Nom</th>
-          <th>Code</th>
-          <th>Entreprise</th>
-          <th>Description</th>
-          <th>Actif</th>
-          <th>Créé le</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let item of filtered">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Nom</th>
+        <th>Code</th>
+        <th>Entreprise</th>
+        <th>Description</th>
+        <th>Actif</th>
+        <th>Créé le</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let item of filtered">
           <td><strong>{{ item.name }}</strong></td>
           <td>
             <span class="badge badge-default" *ngIf="item.code">{{ item.code }}</span>
@@ -66,47 +86,66 @@
         </tr>
       </tbody>
     </table>
-
-    <div class="empty-state" *ngIf="filtered.length === 0">
-      <div class="empty-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+</div>
+<div class="filter-panel" *ngIf="isSuperAdmin && showFilterPanel">
+  <div class="filter-panel-header">
+    <h4>Filtres</h4>
+    <button class="close-btn" (click)="closeFilterPanel()"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <div class="filter-panel-body">
+    <div class="filter-section">
+      <h5><i class="bi bi-building"></i> Entreprise</h5>
+      <div class="filter-options">
+        <button class="filter-option" *ngFor="let company of companies" [class.active]="isPendingCompanySelected(company.id)" (click)="togglePendingCompanySelection(company.id)">
+          <i class="bi" [ngClass]="isPendingCompanySelected(company.id) ? 'bi-check-circle-fill' : 'bi-circle'"></i>
+          <span>{{ company.name }}</span>
+        </button>
       </div>
-      <h3>Aucun département</h3>
-      <p>Commencez par en créer un.</p>
     </div>
+    <div class="filter-section">
+      <h5><i class="bi bi-toggle-on"></i> Statut</h5>
+      <div class="filter-options">
+        <button class="filter-option" [class.active]="pendingActivity === 'true'" (click)="togglePendingActivitySelection('true')">
+          <i class="bi" [ngClass]="pendingActivity === 'true' ? 'bi-check-circle-fill' : 'bi-circle'"></i>
+          <span>Actif</span>
+        </button>
+        <button class="filter-option" [class.active]="pendingActivity === 'false'" (click)="togglePendingActivitySelection('false')">
+          <i class="bi" [ngClass]="pendingActivity === 'false' ? 'bi-check-circle-fill' : 'bi-circle'"></i>
+          <span>Inactif</span>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="filter-panel-footer">
+    <button class="btn btn-secondary" type="button" (click)="resetPendingFilters()">Réinitialiser</button>
+    <button class="btn btn-primary" type="button" (click)="applyPendingFilters()">Appliquer</button>
+    <button class="btn btn-secondary" type="button" (click)="closeFilterPanel()">Fermer</button>
   </div>
 </div>
 
-<!-- ── Modal ─────────────────────────────────────────────────────────────── -->
+
 <div class="modal-overlay" *ngIf="showModal" (click)="close()">
-  <div class="modal" (click)="$event.stopPropagation()">
+  <div class="custom-modal" (click)="$event.stopPropagation()">
 
     <div class="modal-header">
       <h3>{{ editing ? 'Modifier' : 'Nouveau' }} département</h3>
-      <button class="btn btn-icon btn-secondary" (click)="close()">
-        <svg viewBox="0 0 20 20" fill="currentColor" width="16"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+      <button class="close-btn" (click)="close()">
+        <svg viewBox="0 0 20 20" fill="currentColor" width="20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
       </button>
     </div>
 
     <div class="modal-body">
-
       <div class="api-error" *ngIf="errors['api']">{{ errors['api'] }}</div>
 
-      <!-- Entreprise -->
-      <div class="form-group" [class.has-error]="hasError('companyId')">
-        <label>
-          Entreprise <span class="required">*</span>
-        </label>
+      <div class="form-group" [class.has-error]="hasError('companyId')" *ngIf="isSuperAdmin">
+        <label>Entreprise <span class="required">*</span></label>
         <select [(ngModel)]="form.companyId">
           <option value="">— Sélectionner une entreprise —</option>
-          <option *ngFor="let c of companies" [value]="c.id">
-            {{ c.name }}
-          </option>
+          <option *ngFor="let c of companies" [value]="c.id">{{ c.name }}</option>
         </select>
         <span class="field-error" *ngIf="hasError('companyId')">{{ errors['companyId'] }}</span>
       </div>
 
-      <!-- Nom + Code -->
       <div class="form-row">
         <div class="form-group" [class.has-error]="hasError('name')">
           <label>Nom <span class="required">*</span></label>
@@ -119,13 +158,11 @@
         </div>
       </div>
 
-      <!-- Description -->
       <div class="form-group">
         <label>Description</label>
-        <textarea [(ngModel)]="form.description" placeholder="Description optionnelle..."></textarea>
+        <textarea [(ngModel)]="form.description" rows="3" placeholder="Description optionnelle..."></textarea>
       </div>
 
-      <!-- Actif -->
       <div class="form-group">
         <label>Statut</label>
         <select [(ngModel)]="form.isActive">
@@ -133,7 +170,6 @@
           <option [ngValue]="false">Inactif</option>
         </select>
       </div>
-
     </div>
 
     <div class="modal-footer">

@@ -1,19 +1,60 @@
+<!-- src/app/features/contracts/contracts.component.html -->
 <div class="page-header">
   <div>
     <h1>Contrats</h1>
-    <p class="page-subtitle">Gestion des contrats de travail</p>
+    <p class="page-subtitle">Gestion des contrats de travail et de service</p>
   </div>
-  <button class="btn btn-primary" (click)="openCreate()">
-    <i class="bi bi-plus-lg"></i> Ajouter
-  </button>
+  <div class="header-actions">
+    <button class="btn btn-primary" (click)="openCreate()">
+      <i class="bi bi-plus-lg"></i> Ajouter contrat employé
+    </button>
+  </div>
+</div>
+
+<!-- Erreur génération PDF globale -->
+<div class="pdf-error-banner" *ngIf="pdfError">
+  <i class="bi bi-exclamation-circle-fill"></i>
+  {{ pdfError }}
+  <button class="pdf-error-close" (click)="pdfError = ''"><i class="bi bi-x"></i></button>
 </div>
 
 <div class="table-container">
   <div class="table-toolbar">
-    <h2>Liste des contrats</h2>
-    <div class="search-input">
-      <i class="bi bi-search"></i>
-      <input type="text" placeholder="Rechercher par employé, type ou statut..." [(ngModel)]="search" (input)="onSearch()" />
+    <div class="toolbar-heading">
+      <h2>Liste des contrats</h2>
+      <p class="toolbar-subtitle">Liste des contrats ({{ filtered.length }})</p>
+    </div>
+    <div class="toolbar-actions">
+      <div class="search-input">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="text" placeholder="Rechercher par employé, type ou statut..." [(ngModel)]="search" (input)="onSearch()" />
+      </div>
+      <div class="active-filters" *ngIf="companyFilterId || typeFilter || statusFilter">
+        <div class="filter-chips">
+          <span class="filter-chip" *ngIf="companyFilterId">
+            <i class="bi bi-building"></i>
+            {{ companyName(companyFilterId) }}
+            <button class="chip-remove" type="button" (click)="clearCompanyFilter()"><i class="bi bi-x"></i></button>
+          </span>
+          <span class="filter-chip" *ngIf="typeFilter">
+            <i class="bi bi-tags"></i>
+            {{ typeFilter }}
+            <button class="chip-remove" type="button" (click)="clearTypeFilter()"><i class="bi bi-x"></i></button>
+          </span>
+          <span class="filter-chip" *ngIf="statusFilter">
+            <i class="bi bi-list-task"></i>
+            {{ statusFilter }}
+            <button class="chip-remove" type="button" (click)="clearStatusFilter()"><i class="bi bi-x"></i></button>
+          </span>
+        </div>
+      </div>
+      <button class="btn-filter" *ngIf="isSuperAdmin" (click)="openFilterPanel()" [class.active]="showFilterPanel">
+        <i class="bi bi-funnel-fill"></i>
+        <span>Filtrer</span>
+        <span class="filter-badge" *ngIf="companyFilterId || typeFilter || statusFilter">
+          {{ (companyFilterId ? 1 : 0) + (typeFilter ? 1 : 0) + (statusFilter ? 1 : 0) }}
+        </span>
+      </button>
     </div>
   </div>
 
@@ -45,15 +86,42 @@
           <td>{{ item.startDate | date:'dd/MM/yyyy' }}</td>
           <td>{{ item.endDate ? (item.endDate | date:'dd/MM/yyyy') : '—' }}</td>
           <td class="amount-cell">{{ item.baseSalary | number:'1.2-2' }} MAD</td>
-          <td>
+          <td class="actions">
             <div class="actions">
-              <button class="btn btn-icon btn-secondary" (click)="openEdit(item)" title="Modifier"><i class="bi bi-pencil"></i></button>
-              <button class="btn btn-icon btn-danger" (click)="delete(item.id)" title="Supprimer"><i class="bi bi-trash"></i></button>
+              <!-- Voir détails -->
+              <button class="btn btn-icon btn-eye" (click)="viewContractDetails(item)" title="Voir détails contrat">
+                <i class="bi bi-eye"></i>
+              </button>
+
+              <!-- Générer PDF via backend (HBS + Puppeteer) -->
+              <button
+                class="btn btn-icon btn-pdf"
+                (click)="generateEmployeeContract(item)"
+                [disabled]="generatingPdfId === item.id"
+                [title]="generatingPdfId === item.id ? 'Génération en cours...' : 'Télécharger contrat PDF'">
+                <span *ngIf="generatingPdfId !== item.id">
+                  <i class="bi bi-file-earmark-pdf"></i>
+                </span>
+                <span *ngIf="generatingPdfId === item.id" class="pdf-spinner">
+                  <i class="bi bi-arrow-repeat spin"></i>
+                </span>
+              </button>
+
+              <!-- Modifier -->
+              <button class="btn btn-icon btn-secondary" (click)="openEdit(item)" title="Modifier">
+                <i class="bi bi-pencil"></i>
+              </button>
+
+              <!-- Supprimer -->
+              <button class="btn btn-icon btn-danger" (click)="delete(item.id)" title="Supprimer">
+                <i class="bi bi-trash"></i>
+              </button>
             </div>
           </td>
         </tr>
       </tbody>
     </table>
+
     <div class="empty-state" *ngIf="filtered.length === 0">
       <i class="bi bi-file-earmark-text" style="font-size:40px;color:var(--text-muted);"></i>
       <h3>Aucun contrat</h3>
@@ -62,81 +130,487 @@
   </div>
 </div>
 
-<!-- Modal -->
+<!-- ══════════════════════════════════════════════════════
+     FILTER PANEL
+══════════════════════════════════════════════════════ -->
+<div class="filter-panel" *ngIf="isSuperAdmin && showFilterPanel">
+  <div class="filter-panel-header">
+    <h4>Filtres</h4>
+    <button class="close-btn" type="button" (click)="closeFilterPanel()"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <div class="filter-panel-body">
+    <div class="filter-section">
+      <h5><i class="bi bi-building"></i> Entreprise</h5>
+      <div class="filter-options">
+        <button type="button" class="filter-option"
+                *ngFor="let company of companies"
+                [class.active]="pendingCompanyFilterId === company.id"
+                (click)="togglePendingCompanySelection(company.id)">
+          <i class="bi" [ngClass]="pendingCompanyFilterId === company.id ? 'bi-check-circle-fill' : 'bi-circle'"></i>
+          <span>{{ company.name }}</span>
+        </button>
+      </div>
+    </div>
+    <div class="filter-section">
+      <h5><i class="bi bi-tags"></i> Type</h5>
+      <div class="filter-options">
+        <button type="button" class="filter-option"
+                *ngFor="let type of typeOptions"
+                [class.active]="pendingTypeFilter === type"
+                (click)="togglePendingTypeSelection(type)">
+          <i class="bi" [ngClass]="pendingTypeFilter === type ? 'bi-check-circle-fill' : 'bi-circle'"></i>
+          <span>{{ type }}</span>
+        </button>
+      </div>
+    </div>
+    <div class="filter-section">
+      <h5><i class="bi bi-list-task"></i> Statut</h5>
+      <div class="filter-options">
+        <button type="button" class="filter-option"
+                *ngFor="let status of statusOptions"
+                [class.active]="pendingStatusFilter === status"
+                (click)="togglePendingStatusSelection(status)">
+          <i class="bi" [ngClass]="pendingStatusFilter === status ? 'bi-check-circle-fill' : 'bi-circle'"></i>
+          <span>{{ status }}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="filter-panel-footer">
+    <button class="btn btn-secondary" type="button" (click)="resetPendingFilters()">Réinitialiser</button>
+    <button class="btn btn-primary" type="button" (click)="applyPendingFilters()">Appliquer</button>
+    <button class="btn btn-secondary" type="button" (click)="closeFilterPanel()">Fermer</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     MODAL DÉTAILS DU CONTRAT - REDESIGNED
+══════════════════════════════════════════════════════ -->
+<div class="modal-overlay" *ngIf="showContractDetailsModal" (click)="closeContractDetails()">
+  <div class="modal-contract-detail" (click)="$event.stopPropagation()">
+    
+    <!-- Header with contract type badge -->
+    <div class="contract-detail-header">
+      <div class="contract-detail-badge" [ngClass]="typeClass(selectedContract?.contractType)">
+        {{ selectedContract?.contractType }}
+      </div>
+      <div class="contract-detail-status" [ngClass]="statusClass(selectedContract?.status)">
+        <span class="status-dot"></span>
+        {{ selectedContract?.status }}
+      </div>
+      <button class="btn btn-icon btn-secondary contract-detail-close" (click)="closeContractDetails()">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="contract-detail-tabs">
+      <button class="cd-tab" [class.active]="contractDetailsTab === 'general'" (click)="contractDetailsTab = 'general'">
+        <i class="bi bi-info-circle"></i> Général
+      </button>
+      <button class="cd-tab" [class.active]="contractDetailsTab === 'remuneration'" (click)="contractDetailsTab = 'remuneration'">
+        <i class="bi bi-cash-stack"></i> Rémunération
+      </button>
+      <button class="cd-tab" [class.active]="contractDetailsTab === 'employe'" (click)="contractDetailsTab = 'employe'">
+        <i class="bi bi-person-badge"></i> Employé
+      </button>
+    </div>
+
+    <!-- Tab Content -->
+    <div class="contract-detail-body">
+      
+      <!-- General Tab -->
+      <div class="cd-tab-content" *ngIf="contractDetailsTab === 'general'">
+        <div class="cd-section">
+          <h4 class="cd-section-title">
+            <i class="bi bi-calendar3"></i> Période
+          </h4>
+          <div class="cd-period-cards">
+            <div class="cd-period-card">
+              <div class="cd-period-icon start">
+                <i class="bi bi-play-circle-fill"></i>
+              </div>
+              <div class="cd-period-info">
+                <span class="cd-period-label">Date de début</span>
+                <span class="cd-period-value">{{ formatDate(selectedContract?.startDate) }}</span>
+              </div>
+            </div>
+            <div class="cd-period-divider">
+              <i class="bi bi-arrow-right"></i>
+            </div>
+            <div class="cd-period-card">
+              <div class="cd-period-icon" [class.end]="!selectedContract?.endDate" [class.end-set]="selectedContract?.endDate">
+                <i class="bi" [ngClass]="selectedContract?.endDate ? 'bi-stop-circle-fill' : 'bi-infinity'"></i>
+              </div>
+              <div class="cd-period-info">
+                <span class="cd-period-label">Date de fin</span>
+                <span class="cd-period-value">{{ selectedContract?.endDate ? formatDate(selectedContract.endDate) : 'Indéterminée' }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="cd-section" *ngIf="selectedContract?.notes">
+          <h4 class="cd-section-title">
+            <i class="bi bi-chat-left-text"></i> Notes
+          </h4>
+          <div class="cd-notes-box">
+            <i class="bi bi-quote"></i>
+            <p>{{ selectedContract?.notes }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Remuneration Tab -->
+      <div class="cd-tab-content" *ngIf="contractDetailsTab === 'remuneration'">
+        <div class="cd-section">
+          <h4 class="cd-section-title">
+            <i class="bi bi-wallet2"></i> Détails de la rémunération
+          </h4>
+          <div class="cd-salary-highlight">
+            <div class="cd-salary-main">
+              <span class="cd-salary-amount">{{ formatMoney(selectedContract?.baseSalary) }}</span>
+              <span class="cd-salary-label">Salaire de base</span>
+            </div>
+          </div>
+          <div class="cd-remuneration-grid">
+            <div class="cd-remuneration-item">
+              <div class="cd-remuneration-icon">
+                <i class="bi bi-clock"></i>
+              </div>
+              <div class="cd-remuneration-info">
+                <span class="cd-remuneration-value">{{ selectedContract?.hoursPerMonth || '—' }}h</span>
+                <span class="cd-remuneration-label">Heures / mois</span>
+              </div>
+            </div>
+            <div class="cd-remuneration-item">
+              <div class="cd-remuneration-icon">
+                <i class="bi bi-calendar-check"></i>
+              </div>
+              <div class="cd-remuneration-info">
+                <span class="cd-remuneration-value">{{ selectedContract?.workingDaysPerMonth || '—' }}j</span>
+                <span class="cd-remuneration-label">Jours ouvrés / mois</span>
+              </div>
+            </div>
+            <div class="cd-remuneration-item">
+              <div class="cd-remuneration-icon">
+                <i class="bi bi-bus-front"></i>
+              </div>
+              <div class="cd-remuneration-info">
+                <span class="cd-remuneration-value">{{ formatMoney(selectedContract?.transportAllowance) }}</span>
+                <span class="cd-remuneration-label">Indemnité transport</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Employee Tab - FIXED to show names instead of IDs -->
+      <div class="cd-tab-content" *ngIf="contractDetailsTab === 'employe'">
+        <div class="cd-section">
+          <h4 class="cd-section-title">
+            <i class="bi bi-person-lines-fill"></i> Informations employé
+          </h4>
+          
+          <!-- Employee identity card -->
+          <div class="cd-employee-card">
+            <div class="cd-employee-avatar">
+              {{ getEmployeeName(selectedContract?.employeeId).charAt(0) }}
+            </div>
+            <div class="cd-employee-main">
+              <h3>{{ getEmployeeName(selectedContract?.employeeId) }}</h3>
+              <div class="cd-employee-badges">
+                <span class="cd-employee-badge" *ngIf="getEmployeeCin(selectedContract?.employeeId)">
+                  <i class="bi bi-credit-card-2-front"></i>
+                  CIN {{ getEmployeeCin(selectedContract?.employeeId) }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Contact details -->
+          <div class="cd-contact-grid">
+            <div class="cd-contact-item">
+              <i class="bi bi-envelope"></i>
+              <div>
+                <span class="cd-contact-label">Email</span>
+                <span class="cd-contact-value">{{ getEmployeeEmail(selectedContract?.employeeId) || '—' }}</span>
+              </div>
+            </div>
+            <div class="cd-contact-item">
+              <i class="bi bi-telephone"></i>
+              <div>
+                <span class="cd-contact-label">Téléphone</span>
+                <span class="cd-contact-value">{{ getEmployeePhone(selectedContract?.employeeId) || '—' }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Department & Position - NOW SHOWING NAMES -->
+          <div class="cd-org-grid">
+            <div class="cd-org-item">
+              <div class="cd-org-icon">
+                <i class="bi bi-diagram-3"></i>
+              </div>
+              <div class="cd-org-info">
+                <span class="cd-org-label">Département</span>
+                <span class="cd-org-value">
+                  {{ departmentName(getEmployeeDepartmentId(selectedContract?.employeeId)) || '—' }}
+                </span>
+              </div>
+            </div>
+            <div class="cd-org-item">
+              <div class="cd-org-icon">
+                <i class="bi bi-briefcase"></i>
+              </div>
+              <div class="cd-org-info">
+                <span class="cd-org-label">Poste</span>
+                <span class="cd-org-value">
+                  {{ positionName(getEmployeePositionId(selectedContract?.employeeId)) || '—' }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="contract-detail-footer">
+      <button class="btn btn-pdf-outline" (click)="generateEmployeeContract(selectedContract)" [disabled]="generatingPdfId === selectedContract?.id">
+        <span *ngIf="generatingPdfId !== selectedContract?.id">
+          <i class="bi bi-file-earmark-pdf"></i> Télécharger PDF
+        </span>
+        <span *ngIf="generatingPdfId === selectedContract?.id">
+          <i class="bi bi-arrow-repeat spin"></i> Génération...
+        </span>
+      </button>
+      <button class="btn btn-secondary" (click)="closeContractDetails()">Fermer</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     MODAL CREATE / EDIT CONTRAT
+══════════════════════════════════════════════════════ -->
 <div class="modal-overlay" *ngIf="showModal" (click)="close()">
-  <div class="modal modal-lg" (click)="$event.stopPropagation()">
+  <div class="modal-box" (click)="$event.stopPropagation()">
     <div class="modal-header">
-      <h3><i class="bi bi-file-earmark-text-fill" style="color:var(--accent);"></i> {{ editing ? 'Modifier le contrat' : 'Nouveau contrat' }}</h3>
+      <h3>{{ editing ? 'Modifier le contrat' : 'Nouveau contrat' }}</h3>
       <button class="btn btn-icon btn-secondary" (click)="close()"><i class="bi bi-x-lg"></i></button>
     </div>
     <div class="modal-body">
-      <div class="error-msg" *ngIf="error"><i class="bi bi-exclamation-triangle-fill"></i> {{ error }}</div>
 
-      <div class="form-group">
-        <label>Employé <span class="req">*</span></label>
-        <select [(ngModel)]="form.employeeId">
-          <option value="" disabled>-- Sélectionner un employé --</option>
-          <option *ngFor="let e of employees" [value]="e.id">
-            {{ e.firstName }} {{ e.lastName }} {{ e.employeeCode ? '(' + e.employeeCode + ')' : '' }}
-          </option>
-        </select>
+      <div class="error-msg" *ngIf="error">
+        <i class="bi bi-exclamation-circle-fill"></i>
+        {{ error }}
       </div>
 
-      <div class="form-grid-2">
-        <div class="form-group">
-          <label>Type de contrat <span class="req">*</span></label>
-          <select [(ngModel)]="form.contractType">
-            <option *ngFor="let t of typeOptions" [value]="t">{{ t }}</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Statut</label>
-          <select [(ngModel)]="form.status">
-            <option *ngFor="let s of statusOptions" [value]="s">{{ s }}</option>
-          </select>
+      <div class="warning-msg" *ngIf="activeContractWarning">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        <div class="warning-content">
+          <strong>⚠️ Impossible de créer ce contrat</strong>
+          <p>{{ activeContractWarning }}</p>
+          <span class="warning-suggestion">💡 Solution : Terminez d'abord le contrat actif avant d'en créer un nouveau.</span>
         </div>
       </div>
 
-      <div class="form-grid-2">
-        <div class="form-group">
-          <label>Date de début <span class="req">*</span></label>
-          <input type="date" [(ngModel)]="form.startDate" />
+      <!-- Sélection en cascade — Super Admin -->
+      <ng-container *ngIf="isSuperAdmin">
+        <div class="cascade-section">
+          <div class="cascade-label">
+            <i class="bi bi-diagram-3"></i>
+            Sélection en cascade
+          </div>
+          <div class="row">
+            <div class="col-md-6">
+              <div class="form-group">
+                <label>Entreprise <span class="req">*</span></label>
+                <app-searchable-select
+                  [items]="companies"
+                  displayField="name"
+                  valueField="id"
+                  [(ngModel)]="cascade.companyId"
+                  (valueChange)="onCascadeCompanyChange()"
+                  placeholder="— Sélectionner une entreprise —">
+                </app-searchable-select>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-group">
+                <label>Département</label>
+                <app-searchable-select
+                  [items]="cascadeDepartments"
+                  displayField="name"
+                  valueField="id"
+                  [(ngModel)]="cascade.departmentId"
+                  (valueChange)="onCascadeDepartmentChange()"
+                  [disabled]="!cascade.companyId"
+                  placeholder="— Tous les départements —">
+                </app-searchable-select>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-group">
+                <label>Poste</label>
+                <app-searchable-select
+                  [items]="cascadePositions"
+                  displayField="name"
+                  valueField="id"
+                  [(ngModel)]="cascade.positionId"
+                  (valueChange)="onCascadePositionChange()"
+                  [disabled]="!cascade.companyId"
+                  placeholder="— Tous les postes —">
+                </app-searchable-select>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-group">
+                <label>Employé <span class="req">*</span></label>
+                <app-searchable-select
+                  [items]="cascadeEmployees"
+                  displayField="firstName"
+                  valueField="id"
+                  [(ngModel)]="form.employeeId"
+                  (valueChange)="onEmployeeSelect()"
+                  [disabled]="!cascade.companyId"
+                  placeholder="— Sélectionner un employé —">
+                </app-searchable-select>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="form-group">
-          <label>Date de fin <small>(optionnel pour CDI)</small></label>
-          <input type="date" [(ngModel)]="form.endDate" />
+      </ng-container>
+
+      <!-- Sélection — Non Super Admin -->
+      <ng-container *ngIf="!isSuperAdmin">
+        <div class="row">
+          <div class="col-md-6">
+            <div class="form-group">
+              <label>Département</label>
+              <app-searchable-select
+                [items]="cascadeDepartments"
+                displayField="name"
+                valueField="id"
+                [(ngModel)]="cascade.departmentId"
+                (valueChange)="onCascadeDepartmentChange()"
+                placeholder="— Tous les départements —">
+              </app-searchable-select>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-group">
+              <label>Poste</label>
+              <app-searchable-select
+                [items]="cascadePositions"
+                displayField="name"
+                valueField="id"
+                [(ngModel)]="cascade.positionId"
+                (valueChange)="onCascadePositionChange()"
+                placeholder="— Tous les postes —">
+              </app-searchable-select>
+            </div>
+          </div>
+          <div class="col-md-12">
+            <div class="form-group">
+              <label>Employé <span class="req">*</span></label>
+              <app-searchable-select
+                [items]="cascadeEmployees"
+                displayField="firstName"
+                valueField="id"
+                [(ngModel)]="form.employeeId"
+                (valueChange)="onEmployeeSelect()"
+                placeholder="— Sélectionner un employé —">
+              </app-searchable-select>
+            </div>
+          </div>
         </div>
-      </div>
+      </ng-container>
 
-      <div class="form-group">
-        <label>Salaire de base (MAD) <span class="req">*</span></label>
-        <input type="number" step="0.01" min="0" [(ngModel)]="form.baseSalary" placeholder="ex: 5000" />
-      </div>
-
-      <div class="form-grid-2">
-        <div class="form-group">
-          <label>Heures/mois</label>
-          <input type="number" step="0.5" min="0" [(ngModel)]="form.hoursPerMonth" placeholder="ex: 191" />
+      <!-- Informations du contrat -->
+      <div class="contract-info-section">
+        <div class="section-title">
+          <i class="bi bi-file-text"></i>
+          Informations du contrat
         </div>
-        <div class="form-group">
-          <label>Jours ouvrés/mois</label>
-          <input type="number" step="0.5" min="0" [(ngModel)]="form.workingDaysPerMonth" placeholder="ex: 26" />
+        <div class="row">
+          <div class="col-md-6">
+            <div class="form-group">
+              <label>Type de contrat <span class="req">*</span></label>
+              <select class="form-control" [(ngModel)]="form.contractType">
+                <option *ngFor="let t of typeOptions" [value]="t">{{ t }}</option>
+              </select>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-group">
+              <label>Statut</label>
+              <select class="form-control" [(ngModel)]="form.status">
+                <option *ngFor="let s of statusOptions" [value]="s">{{ s }}</option>
+              </select>
+            </div>
+          </div>
         </div>
-      </div>
-
-      <div class="form-group">
-        <label>Indemnité de transport (MAD)</label>
-        <input type="number" step="0.01" min="0" [(ngModel)]="form.transportAllowance" placeholder="ex: 300" />
-      </div>
-
-      <div class="form-group">
-        <label>Notes</label>
-        <input type="text" [(ngModel)]="form.notes" placeholder="Remarques..." />
+        <div class="row">
+          <div class="col-md-6">
+            <div class="form-group">
+              <label>Date de début <span class="req">*</span></label>
+              <input type="date" class="form-control" [(ngModel)]="form.startDate" />
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-group">
+              <label>Date de fin <small>(optionnel)</small></label>
+              <input type="date" class="form-control" [(ngModel)]="form.endDate" />
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-md-12">
+            <div class="form-group">
+              <label>Salaire de base (MAD) <span class="req">*</span></label>
+              <input type="number" step="0.01" min="0" class="form-control" [(ngModel)]="form.baseSalary" placeholder="ex: 5000" />
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-md-6">
+            <div class="form-group">
+              <label>Heures / mois</label>
+              <input type="number" step="0.5" min="0" class="form-control" [(ngModel)]="form.hoursPerMonth" placeholder="ex: 191" />
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-group">
+              <label>Jours ouvrés / mois</label>
+              <input type="number" step="0.5" min="0" class="form-control" [(ngModel)]="form.workingDaysPerMonth" placeholder="ex: 26" />
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-md-6">
+            <div class="form-group">
+              <label>Indemnité de transport (MAD)</label>
+              <input type="number" step="0.01" min="0" class="form-control" [(ngModel)]="form.transportAllowance" placeholder="ex: 300" />
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-group">
+              <label>Notes</label>
+              <input type="text" class="form-control" [(ngModel)]="form.notes" placeholder="Remarques..." />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
+
     <div class="modal-footer">
-      <button class="btn btn-secondary" (click)="close()"><i class="bi bi-x-circle"></i> Annuler</button>
-      <button class="btn btn-primary" (click)="save()"><i class="bi bi-check-circle-fill"></i> {{ editing ? 'Enregistrer' : 'Créer' }}</button>
+      <button class="btn btn-secondary" (click)="close()">Annuler</button>
+      <button class="btn btn-primary" [disabled]="!!activeContractWarning" (click)="save()">
+        {{ editing ? 'Enregistrer' : 'Créer' }}
+      </button>
     </div>
   </div>
 </div>

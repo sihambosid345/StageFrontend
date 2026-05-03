@@ -4,21 +4,42 @@
     <p class="page-subtitle">Suivi des présences des employés</p>
   </div>
   <button class="btn btn-primary" (click)="openCreate()">
-    <i class="bi bi-plus-lg"></i> Ajouter
+    <i class="bi bi-calendar-plus"></i> Ajouter
   </button>
 </div>
 
 <div class="table-container">
   <div class="table-toolbar">
-    <h2>Registre des présences</h2>
-    <div class="search-input">
-      <i class="bi bi-search"></i>
-      <input type="text" placeholder="Rechercher par employé, statut ou date..." [(ngModel)]="search" (input)="onSearch()" />
+    <div class="toolbar-heading">
+      <h2>Registre des présences</h2>
+      <p class="toolbar-subtitle">Liste des présences ({{ filtered.length }})</p>
+    </div>
+    <div class="toolbar-actions">
+      <div class="search-input">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="text" placeholder="Rechercher par employé, statut..." [(ngModel)]="search" (input)="onSearch()" />
+      </div>
+      <div class="active-filters" *ngIf="companyFilterId">
+        <div class="filter-chips">
+          <span class="filter-chip">
+            <i class="bi bi-building"></i>
+            {{ companyName(companyFilterId) }}
+            <button class="chip-remove" type="button" (click)="clearCompanyFilter()">
+              <i class="bi bi-x"></i>
+            </button>
+          </span>
+        </div>
+      </div>
+      <button class="btn-filter" *ngIf="isSuperAdmin" (click)="openFilterPanel()" [class.active]="showFilterPanel">
+        <i class="bi bi-funnel-fill"></i>
+        <span>Filtrer</span>
+        <span class="filter-badge" *ngIf="companyFilterId">1</span>
+      </button>
     </div>
   </div>
 
   <div *ngIf="loading" class="loading-spinner"></div>
-
+  
   <div class="table-scroll" *ngIf="!loading">
     <table *ngIf="filtered.length > 0">
       <thead>
@@ -36,88 +57,173 @@
         <tr *ngFor="let item of filtered">
           <td>
             <div class="emp-cell">
-              <div class="emp-avatar">{{ getEmployeeName(item.employeeId).charAt(0) }}</div>
-              {{ getEmployeeName(item.employeeId) }}
+              <div class="emp-avatar">
+                {{ getEmployeeName(item.employeeId).charAt(0) }}
+              </div>
+              <strong>{{ getEmployeeName(item.employeeId) }}</strong>
             </div>
           </td>
           <td>{{ item.date | date:'dd/MM/yyyy' }}</td>
           <td><span class="badge" [ngClass]="statusClass(item.status)">{{ statusLabel(item.status) }}</span></td>
-          <td>{{ item.workedHours ?? '—' }}</td>
-          <td>{{ item.overtimeHours ?? '—' }}</td>
-          <td>{{ item.lateMinutes ?? '—' }}</td>
+          <td>{{ item.workedHours ?? '—' }}h</td>
+          <td>{{ item.overtimeHours ?? '—' }}h</td>
+          <td>{{ item.lateMinutes ?? '—' }} min</td>
           <td>
             <div class="actions">
-              <button class="btn btn-icon btn-secondary" (click)="openEdit(item)" title="Modifier"><i class="bi bi-pencil"></i></button>
-              <button class="btn btn-icon btn-danger" (click)="delete(item.id)" title="Supprimer"><i class="bi bi-trash"></i></button>
+              <button class="btn btn-icon btn-secondary" (click)="openEdit(item)"><i class="bi bi-pencil"></i></button>
+              <button class="btn btn-icon btn-danger" (click)="delete(item.id)"><i class="bi bi-trash"></i></button>
             </div>
           </td>
         </tr>
       </tbody>
     </table>
+    
     <div class="empty-state" *ngIf="filtered.length === 0">
-      <i class="bi bi-calendar-x" style="font-size:40px;color:var(--text-muted);"></i>
-      <h3>Aucune présence enregistrée</h3>
+      <i class="bi bi-calendar-x"></i>
+      <h3>Aucune présence</h3>
       <p>Commencez par ajouter un enregistrement.</p>
     </div>
   </div>
 </div>
 
-<!-- Modal -->
+<!-- Filter Panel -->
+<div class="filter-panel" *ngIf="isSuperAdmin && showFilterPanel">
+  <div class="filter-panel-header">
+    <h4>Filtres</h4>
+    <button class="close-btn" type="button" (click)="closeFilterPanel()"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <div class="filter-panel-body">
+    <div class="filter-section">
+      <h5><i class="bi bi-building"></i> Entreprise</h5>
+      <div class="filter-options">
+        <button type="button"
+                class="filter-option"
+                *ngFor="let company of companies"
+                [class.active]="pendingCompanyFilterId === company.id"
+                (click)="togglePendingCompanySelection(company.id)">
+          <i class="bi" [ngClass]="pendingCompanyFilterId === company.id ? 'bi-check-circle-fill' : 'bi-circle'"></i>
+          <span>{{ company.name }}</span>
+        </button>
+      </div>
+    </div>
+    <div class="filter-section">
+      <h5><i class="bi bi-list-task"></i> Statut</h5>
+      <div class="filter-options">
+        <button type="button"
+                class="filter-option"
+                *ngFor="let status of statusOptions"
+                [class.active]="pendingStatusFilter === status"
+                (click)="togglePendingStatusSelection(status)">
+          <i class="bi" [ngClass]="pendingStatusFilter === status ? 'bi-check-circle-fill' : 'bi-circle'"></i>
+          <span>{{ statusLabel(status) }}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="filter-panel-footer">
+    <button class="btn btn-secondary" type="button" (click)="resetPendingFilters()">Réinitialiser</button>
+    <button class="btn btn-primary" type="button" (click)="applyPendingFilters()">Appliquer</button>
+    <button class="btn btn-secondary" type="button" (click)="closeFilterPanel()">Fermer</button>
+  </div>
+</div>
+
+<!-- MODAL CREATE / EDIT -->
+<!-- MODAL CREATE / EDIT -->
 <div class="modal-overlay" *ngIf="showModal" (click)="close()">
-  <div class="modal" (click)="$event.stopPropagation()">
+  <div class="modal-box" (click)="$event.stopPropagation()">
     <div class="modal-header">
-      <h3><i class="bi bi-calendar-check" style="color:var(--accent);"></i> {{ editing ? 'Modifier la présence' : 'Ajouter une présence' }}</h3>
+      <h3>
+        <i class="bi bi-calendar-check"></i> 
+        {{ editing ? 'Modifier la présence' : 'Ajouter une présence' }}
+      </h3>
       <button class="btn btn-icon btn-secondary" (click)="close()"><i class="bi bi-x-lg"></i></button>
     </div>
-    <div class="modal-body">
-      <div class="error-msg" *ngIf="error"><i class="bi bi-exclamation-triangle-fill"></i> {{ error }}</div>
 
-      <div class="form-group">
-        <label>Employé <span class="req">*</span></label>
-        <select [(ngModel)]="form.employeeId">
-          <option value="" disabled>-- Sélectionner un employé --</option>
-          <option *ngFor="let e of employees" [value]="e.id">
-            {{ e.firstName }} {{ e.lastName }} {{ e.employeeCode ? '(' + e.employeeCode + ')' : '' }}
-          </option>
-        </select>
+    <div class="modal-body">
+      <div class="api-error" *ngIf="error">
+        <i class="bi bi-exclamation-triangle-fill"></i> {{ error }}
       </div>
 
-      <div class="form-grid-2">
+      <div class="form-section-title">
+        <i class="bi bi-info-circle"></i> Informations Générales
+      </div>
+      
+      <div class="form-group">
+        <label><i class="bi bi-building"></i> Département</label>
+        <app-searchable-select
+          [items]="departments"
+          displayField="name"
+          valueField="id"
+          [(ngModel)]="form.departmentId"
+          (valueChange)="onDepartmentChange()"
+          placeholder="-- Sélectionner un département --">
+        </app-searchable-select>
+        <small class="form-hint" *ngIf="!form.departmentId">
+          <i class="bi bi-info-circle"></i> Veuillez d'abord sélectionner un département
+        </small>
+      </div>
+
+      <div class="form-group">
+        <label><i class="bi bi-person"></i> Employé <span class="required">*</span></label>
+        <app-searchable-select
+          [items]="filteredEmployees"
+          displayField="displayName"
+          valueField="id"
+          [(ngModel)]="form.employeeId"
+          [disabled]="!form.departmentId"
+          placeholder="-- Sélectionner un employé --">
+        </app-searchable-select>
+        <small class="form-hint" *ngIf="!form.departmentId">
+          <i class="bi bi-info-circle"></i> Veuillez d'abord sélectionner un département
+        </small>
+        <small class="form-hint" *ngIf="form.departmentId && filteredEmployees.length === 0">
+          <i class="bi bi-exclamation-triangle"></i> Aucun employé trouvé dans ce département
+        </small>
+      </div>
+
+      <div class="form-row">
         <div class="form-group">
-          <label>Date <span class="req">*</span></label>
+          <label><i class="bi bi-calendar3"></i> Date <span class="required">*</span></label>
           <input type="date" [(ngModel)]="form.date" />
         </div>
         <div class="form-group">
-          <label>Statut <span class="req">*</span></label>
+          <label><i class="bi bi-shield-check"></i> Statut <span class="required">*</span></label>
           <select [(ngModel)]="form.status">
             <option *ngFor="let s of statusOptions" [value]="s">{{ statusLabel(s) }}</option>
           </select>
         </div>
       </div>
 
-      <div class="form-grid-3">
+      <div class="form-section-title">
+        <i class="bi bi-clock"></i> Temps de travail
+      </div>
+      
+      <div class="form-row-three">
         <div class="form-group">
-          <label>Heures travaillées</label>
-          <input type="number" step="0.5" min="0" max="24" [(ngModel)]="form.workedHours" placeholder="ex: 8" />
+          <label><i class="bi bi-hourglass-split"></i> Heures travaillées</label>
+          <input type="number" step="0.5" [(ngModel)]="form.workedHours" placeholder="ex: 8" />
         </div>
         <div class="form-group">
-          <label>Heures supplémentaires</label>
-          <input type="number" step="0.5" min="0" [(ngModel)]="form.overtimeHours" placeholder="ex: 2" />
+          <label><i class="bi bi-plus-circle"></i> Heures sup.</label>
+          <input type="number" step="0.5" [(ngModel)]="form.overtimeHours" placeholder="ex: 2" />
         </div>
         <div class="form-group">
-          <label>Retard (minutes)</label>
-          <input type="number" min="0" [(ngModel)]="form.lateMinutes" placeholder="ex: 15" />
+          <label><i class="bi bi-alarm"></i> Retard (min)</label>
+          <input type="number" [(ngModel)]="form.lateMinutes" placeholder="ex: 15" />
         </div>
       </div>
 
       <div class="form-group">
-        <label>Notes</label>
+        <label><i class="bi bi-sticky"></i> Notes</label>
         <input type="text" [(ngModel)]="form.notes" placeholder="Remarques éventuelles..." />
       </div>
     </div>
+
     <div class="modal-footer">
-      <button class="btn btn-secondary" (click)="close()"><i class="bi bi-x-circle"></i> Annuler</button>
-      <button class="btn btn-primary" (click)="save()"><i class="bi bi-check-circle-fill"></i> {{ editing ? 'Enregistrer' : 'Créer' }}</button>
+      <button class="btn btn-secondary" (click)="close()">Annuler</button>
+      <button class="btn btn-primary" (click)="save()">
+        {{ editing ? 'Enregistrer' : 'Créer' }}
+      </button>
     </div>
   </div>
 </div>

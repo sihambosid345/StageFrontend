@@ -1,9 +1,9 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
-  EmployeeService, DepartmentService,
-  PositionService
+  CompanyService, EmployeeService, DepartmentService,
+  PositionService, ContractService
 } from '../../core/services/domain.services';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -15,27 +15,47 @@ import {
 } from '../../core/models';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
+import { SearchableSelectComponent } from '../../shared/searchable-select.component';
 
 @Component({
   selector: 'app-employees',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, SearchableSelectComponent],
   templateUrl: './employees.component.html',
   styleUrls: ['./employees.component.scss']
 })
 export class EmployeesComponent implements OnInit {
-  items: Employee[]         = [];
-  filtered: Employee[]      = [];
-  companies: Company[]      = [];
+  items: Employee[] = [];
+  filtered: Employee[] = [];
+  companies: Company[] = [];
   departments: Department[] = [];
-  positions: Position[]     = [];
+  positions: Position[] = [];
 
-  loading   = true;
+  // Listes filtrées pour la cascade
+  filteredDepartmentsList: Department[] = [];
+  filteredPositionsList: Position[] = [];
+
+  loading = true;
   showModal = false;
-  editing   = false;
+  editing = false;
   editingId = '';
-  search    = '';
+  search = '';
+  companyFilterId = '';
+  departmentFilterId = '';
+  statusFilter = '';
+  showFilterPanel = false;
+  pendingCompanyId = '';
+  pendingDepartmentId = '';
+  pendingStatus = '';
   errors: FormErrors = {};
+
+  showInfoModal = false;
+  infoEmployee: Employee | null = null;
+  infoTab: 'personnel' | 'contact' | 'pro' | 'salaire' | 'contrat' = 'personnel';
+
+  // Contrats de l'employé affiché
+  employeeContracts: any[] = [];
+  loadingContracts = false;
 
   readonly statusOptions = EMPLOYEE_STATUS_OPTIONS;
   readonly genderOptions = GENDER_OPTIONS;
@@ -43,81 +63,288 @@ export class EmployeesComponent implements OnInit {
   form: any = this.emptyForm();
 
   constructor(
-    private service:  EmployeeService,
-    private deptSvc:  DepartmentService,
-    private posSvc:   PositionService,
-    private api:      ApiService,
-    public  auth:     AuthService,
+    private service: EmployeeService,
+    private deptSvc: DepartmentService,
+    private posSvc: PositionService,
+    private companyService: CompanyService,
+    private contractService: ContractService,
+    private api: ApiService,
+    public auth: AuthService,
+    private cdr: ChangeDetectorRef,
   ) {}
 
   ngOnInit() {
     forkJoin({
-      employees:   this.service.getAll().pipe(catchError(() => of([]))),
-      companies:   this.api.get<Company[]>('/companies/mine').pipe(catchError(() => of([]))),
+      employees: this.service.getAll().pipe(catchError(() => of([]))),
+      companies: this.companyService.getAll().pipe(catchError(() => of([]))),
       departments: this.deptSvc.getAll().pipe(catchError(() => of([]))),
-      positions:   this.posSvc.getAll().pipe(catchError(() => of([]))),
+      positions: this.posSvc.getAll().pipe(catchError(() => of([]))),
     }).subscribe({
       next: (d) => {
-        this.items       = d.employees;
-        this.filtered    = d.employees;
-        this.companies   = d.companies;
+        this.items = d.employees;
+        this.filtered = d.employees;
+        this.companies = d.companies;
         this.departments = d.departments;
-        this.positions   = d.positions;
-        this.loading     = false;
+        this.positions = d.positions;
+        
+        this.updateFilteredDepartments();
+        this.updateFilteredPositions();
+        
+        this.loading = false;
+        this.cdr.detectChanges();
       },
-      error: () => { this.loading = false; }
+      error: () => { 
+        this.loading = false; 
+        this.cdr.detectChanges(); 
+      }
     });
+  }
+
+  // ✅ Mettre à jour les départements filtrés selon entreprise sélectionnée
+  updateFilteredDepartments() {
+    if (!this.form.companyId) {
+      this.filteredDepartmentsList = [];
+    } else {
+      this.filteredDepartmentsList = this.departments.filter(
+        d => d.companyId === this.form.companyId
+      );
+    }
+    // Reset department & position when company changes
+    this.form.departmentId = '';
+    this.form.positionId = '';
+    this.filteredPositionsList = []; // Vider les postes
+    this.cdr.detectChanges();
+  }
+
+  // ✅ Mettre à jour les postes filtrés selon département sélectionné UNIQUEMENT
+  updateFilteredPositions() {
+    // ⚠️ CRITIQUE: Les postes n'apparaissent QUE si un département est sélectionné
+    if (!this.form.departmentId) {
+      this.filteredPositionsList = [];
+    } else {
+      this.filteredPositionsList = this.positions.filter(
+        p => p.departmentId === this.form.departmentId
+      );
+    }
+    this.form.positionId = '';
+    this.cdr.detectChanges();
+  }
+
+  // ✅ Quand l'entreprise change
+  onCompanyChange() {
+    this.updateFilteredDepartments();
+  }
+
+  // ✅ Quand le département change
+  onDepartmentChange() {
+    this.updateFilteredPositions();
   }
 
   load() {
     this.loading = true;
     this.service.getAll().subscribe({
-      next: (data) => { this.items = data; this.filtered = data; this.loading = false; },
-      error: () => { this.loading = false; }
+      next: (data) => {
+        this.items = data;
+        this.applyFilters();
+        this.loading = false;
+        this.cdr.detectChanges();
+      },
+      error: () => { 
+        this.loading = false; 
+        this.cdr.detectChanges(); 
+      }
     });
   }
 
-  onSearch() {
+  onSearch() { 
+    this.applyFilters(); 
+  }
+
+  applyFilters() {
     const q = this.search.toLowerCase();
-    this.filtered = this.items.filter(i =>
-      `${i.firstName} ${i.lastName} ${i.email ?? ''} ${i.cin ?? ''} ${i.matricule ?? ''}`
-        .toLowerCase().includes(q)
-    );
+    this.filtered = this.items.filter(i => {
+      const matchesSearch = `${i.firstName} ${i.lastName} ${i.email ?? ''} ${i.cin ?? ''} ${i.matricule ?? ''}`
+        .toLowerCase().includes(q);
+      const matchesCompany = this.companyFilterId ? i.companyId === this.companyFilterId : true;
+      const matchesDepartment = this.departmentFilterId ? i.departmentId === this.departmentFilterId : true;
+      const matchesStatus = this.statusFilter ? i.status === this.statusFilter : true;
+      return matchesSearch && matchesCompany && matchesDepartment && matchesStatus;
+    });
+  }
+
+  clearCompanyFilter() { 
+    this.companyFilterId = ''; 
+    this.applyFilters(); 
+  }
+  
+  clearDepartmentFilter() { 
+    this.departmentFilterId = ''; 
+    this.applyFilters(); 
+  }
+  
+  clearStatusFilter() { 
+    this.statusFilter = ''; 
+    this.applyFilters(); 
+  }
+
+  openFilterPanel() {
+    this.pendingCompanyId = this.companyFilterId;
+    this.pendingDepartmentId = this.departmentFilterId;
+    this.pendingStatus = this.statusFilter;
+    this.showFilterPanel = true;
+  }
+  
+  closeFilterPanel() { 
+    this.showFilterPanel = false; 
+  }
+
+  togglePendingCompanySelection(companyId: string) {
+    this.pendingCompanyId = this.pendingCompanyId === companyId ? '' : companyId;
+    if (this.pendingDepartmentId) {
+      const dept = this.departments.find(d => d.id === this.pendingDepartmentId);
+      if (dept && dept.companyId !== this.pendingCompanyId) {
+        this.pendingDepartmentId = '';
+      }
+    }
+  }
+  
+  isPendingCompanySelected(companyId: string) { 
+    return this.pendingCompanyId === companyId; 
+  }
+
+  togglePendingDepartmentSelection(deptId: string) {
+    this.pendingDepartmentId = this.pendingDepartmentId === deptId ? '' : deptId;
+  }
+  
+  isPendingDepartmentSelected(deptId: string) { 
+    return this.pendingDepartmentId === deptId; 
+  }
+
+  togglePendingStatusSelection(status: string) {
+    this.pendingStatus = this.pendingStatus === status ? '' : status;
+  }
+
+  applyPendingFilters() {
+    this.companyFilterId = this.pendingCompanyId;
+    this.departmentFilterId = this.pendingDepartmentId;
+    this.statusFilter = this.pendingStatus;
+    this.applyFilters();
+    this.showFilterPanel = false;
+  }
+
+  resetPendingFilters() {
+    this.pendingCompanyId = '';
+    this.pendingDepartmentId = '';
+    this.pendingStatus = '';
+  }
+
+  // Ouvrir modal info + charger contrats
+  openInfo(item: Employee) {
+    this.infoEmployee = item;
+    this.infoTab = 'personnel';
+    this.employeeContracts = [];
+    this.showInfoModal = true;
+    this.loadEmployeeContracts(item.id);
+    this.cdr.detectChanges();
+  }
+
+  loadEmployeeContracts(employeeId: string) {
+    this.loadingContracts = true;
+    this.contractService.getByEmployee(employeeId).pipe(
+      catchError(() => of([]))
+    ).subscribe({
+      next: (contracts) => {
+        this.employeeContracts = contracts;
+        this.loadingContracts = false;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.employeeContracts = [];
+        this.loadingContracts = false;
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  get activeContract(): any | null {
+    return this.employeeContracts.find(c => c.status === 'ACTIVE') ?? null;
+  }
+
+  closeInfo() { 
+    this.showInfoModal = false; 
+    this.cdr.detectChanges(); 
+  }
+  
+  openEditFromInfo() {
+    if (this.infoEmployee) {
+      const emp = this.infoEmployee;
+      this.closeInfo();
+      if (emp) this.openEdit(emp);
+    }
   }
 
   openCreate() {
     this.form = this.emptyForm();
     this.form.companyId = this.auth.currentUser()?.companyId ?? '';
-    this.editing = false; this.editingId = ''; this.errors = {};
+    
+    this.filteredDepartmentsList = [];
+    this.filteredPositionsList = [];
+    this.form.departmentId = '';
+    this.form.positionId = '';
+    
+    this.editing = false;
+    this.editingId = '';
+    this.errors = {};
     this.showModal = true;
+    this.cdr.detectChanges();
   }
 
   openEdit(item: Employee) {
     this.form = {
-      companyId:         item.companyId,
-      employeeCode:      item.employeeCode      ?? '',
-      firstName:         item.firstName,
-      lastName:          item.lastName,
-      cin:               item.cin               ?? '',
-      cnssNumber:        item.cnssNumber         ?? '',
-      matricule:         item.matricule          ?? '',
-      gender:            item.gender             ?? '',
-      birthDate:         item.birthDate?.slice(0, 10) ?? '',
-      phone:             item.phone              ?? '',
-      email:             item.email              ?? '',
-      address:           item.address            ?? '',
-      city:              item.city               ?? '',
-      hireDate:          item.hireDate?.slice(0, 10) ?? '',
-      status:            item.status,
-      departmentId:      item.departmentId       ?? '',
-      positionId:        item.positionId         ?? '',
-      baseSalary:        item.baseSalary         ?? null,
-      paymentMode:       item.paymentMode        ?? '',
-      bankName:          item.bankName           ?? '',
-      bankAccountNumber: item.bankAccountNumber  ?? '',
+      companyId: item.companyId,
+      employeeCode: item.employeeCode ?? '',
+      firstName: item.firstName,
+      lastName: item.lastName,
+      cin: item.cin ?? '',
+      cnssNumber: item.cnssNumber ?? '',
+      matricule: item.matricule ?? '',
+      gender: item.gender ?? '',
+      birthDate: item.birthDate?.slice(0, 10) ?? '',
+      phone: item.phone ?? '',
+      email: item.email ?? '',
+      address: item.address ?? '',
+      city: item.city ?? '',
+      hireDate: item.hireDate?.slice(0, 10) ?? '',
+      status: item.status,
+      departmentId: item.departmentId ?? '',
+      positionId: item.positionId ?? '',
+      baseSalary: item.baseSalary ?? null,
+      paymentMode: item.paymentMode ?? '',
+      bankName: item.bankName ?? '',
+      bankAccountNumber: item.bankAccountNumber ?? '',
     };
-    this.editing = true; this.editingId = item.id; this.errors = {};
+    
+    // Charger les départements de l'entreprise
+    if (this.form.companyId) {
+      this.filteredDepartmentsList = this.departments.filter(
+        d => d.companyId === this.form.companyId
+      );
+    }
+    
+    // Charger les postes du département
+    if (this.form.departmentId) {
+      this.filteredPositionsList = this.positions.filter(
+        p => p.departmentId === this.form.departmentId
+      );
+    } else {
+      this.filteredPositionsList = [];
+    }
+    
+    this.editing = true;
+    this.editingId = item.id;
+    this.errors = {};
     this.showModal = true;
+    this.cdr.detectChanges();
   }
 
   save() {
@@ -128,19 +355,26 @@ export class EmployeesComponent implements OnInit {
     if (!this.auth.isSuperAdmin()) {
       payload.companyId = this.auth.currentUser()?.companyId;
     }
-    if (!payload.gender)       delete payload.gender;
+    if (!payload.gender) delete payload.gender;
     if (!payload.departmentId) delete payload.departmentId;
-    if (!payload.positionId)   delete payload.positionId;
-    if (!payload.birthDate)    delete payload.birthDate;
-    if (!payload.baseSalary)   delete payload.baseSalary;
+    if (!payload.positionId) delete payload.positionId;
+    if (!payload.birthDate) delete payload.birthDate;
+    if (!payload.baseSalary) delete payload.baseSalary;
 
     const obs = this.editing
       ? this.service.update(this.editingId, payload as UpdateEmployeePayload)
       : this.service.create(payload as CreateEmployeePayload);
 
     obs.subscribe({
-      next: () => { this.showModal = false; this.load(); },
-      error: (e: any) => { this.errors['api'] = e?.error?.error || 'Erreur serveur'; }
+      next: () => {
+        this.showModal = false;
+        this.cdr.detectChanges();
+        this.load();
+      },
+      error: (e: any) => {
+        this.errors['api'] = e?.error?.error || 'Erreur serveur';
+        this.cdr.detectChanges();
+      }
     });
   }
 
@@ -149,14 +383,49 @@ export class EmployeesComponent implements OnInit {
     this.service.delete(id).subscribe(() => this.load());
   }
 
-  get filteredPositions(): Position[] {
-    if (!this.form.departmentId) return this.positions;
-    return this.positions.filter(p => p.departmentId === this.form.departmentId);
+  // Helpers contrat
+  contractTypeClass(type: string): string {
+    const m: any = {
+      CDI: 'badge-success', CDD: 'badge-info',
+      STAGE: 'badge-warning', INTERIM: 'badge-purple', FREELANCE: 'badge-secondary'
+    };
+    return m[type] ?? 'badge-secondary';
   }
 
+  contractStatusClass(s: string): string {
+    const m: any = {
+      ACTIVE: 'badge-success', DRAFT: 'badge-secondary',
+      ENDED: 'badge-danger', SUSPENDED: 'badge-warning', TERMINATED: 'badge-danger'
+    };
+    return m[s] ?? 'badge-secondary';
+  }
+
+  formatMoney(amount: number | null | undefined): string {
+    if (amount == null) return '—';
+    return new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount) + ' MAD';
+  }
+
+  formatDate(dateStr: string | null | undefined): string {
+    if (!dateStr) return '—';
+    try {
+      return new Date(dateStr).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
+    } catch { 
+      return dateStr; 
+    }
+  }
+
+  // Getters pour les listes filtrées
   get filteredDepartments(): Department[] {
-    if (!this.form.companyId) return this.departments;
-    return this.departments.filter(d => d.companyId === this.form.companyId);
+    return this.filteredDepartmentsList;
+  }
+
+  get filteredPositions(): Position[] {
+    return this.filteredPositionsList;
+  }
+
+  get filterDepartments(): Department[] {
+    if (!this.pendingCompanyId) return this.departments;
+    return this.departments.filter(d => d.companyId === this.pendingCompanyId);
   }
 
   get currentCompanyName(): string {
@@ -165,14 +434,30 @@ export class EmployeesComponent implements OnInit {
     return this.companies.find(c => c.id === companyId)?.name ?? 'Entreprise assignée automatiquement';
   }
 
-  companyName(id: string)              { return this.companies.find(c => c.id === id)?.name ?? '—'; }
-  departmentName(id?: string | null)   { return id ? (this.departments.find(d => d.id === id)?.name ?? '—') : '—'; }
-  positionName(id?: string | null)     { return id ? (this.positions.find(p => p.id === id)?.name ?? '—') : '—'; }
+  companyName(id?: string | null) { 
+    return id ? (this.companies.find(c => c.id === id)?.name ?? '—') : '—'; 
+  }
+  
+  departmentName(id?: string | null) { 
+    return id ? (this.departments.find(d => d.id === id)?.name ?? '—') : '—'; 
+  }
+  
+  positionName(id?: string | null) { 
+    return id ? (this.positions.find(p => p.id === id)?.name ?? '—') : '—'; 
+  }
 
-  onCompanyChange()    { this.form.departmentId = ''; this.form.positionId = ''; }
-  onDepartmentChange() { this.form.positionId = ''; }
-  close()              { this.showModal = false; }
-  hasError(f: string)  { return !!this.errors[f]; }
+  get isSuperAdmin(): boolean { 
+    return this.auth.isSuperAdmin(); 
+  }
+
+  close() { 
+    this.showModal = false; 
+    this.cdr.detectChanges(); 
+  }
+  
+  hasError(f: string) { 
+    return !!this.errors[f]; 
+  }
 
   private emptyForm(): any {
     return {
