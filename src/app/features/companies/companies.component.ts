@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -45,7 +45,6 @@ export class CompaniesComponent implements OnInit {
   errors: FormErrors = {};
   createMode: 'simple' | 'combined' = 'combined';
   
-  // Pour l'édition avec licence et utilisateurs
   editModalTab: 'company' | 'license' | 'users' = 'company';
   editingLicense: any = null;
   editingUsers: any[] = [];
@@ -73,7 +72,6 @@ export class CompaniesComponent implements OnInit {
   readonly billingOptions = BILLING_CYCLE_OPTIONS;
 
   readonly USER_ROLES = ['ADMIN', 'HR_MANAGER', 'PAYROLL_MANAGER', 'EMPLOYEE', 'VIEWER'];
-  readonly LICENSE_STATUS_OPTIONS = ['ACTIVE', 'TRIAL', 'EXPIRED', 'SUSPENDED'];
   readonly PERMISSIONS = [
     { key: 'dashboard', label: 'Tableau de bord' },
     { key: 'employees', label: 'Employés' },
@@ -113,7 +111,6 @@ export class CompaniesComponent implements OnInit {
   pendingCompanyIds: string[] = [];
   pendingStatuses: string[] = [];
 
-
   constructor(
     private service: CompanyService,
     private licenseService: LicenseService,
@@ -122,27 +119,41 @@ export class CompaniesComponent implements OnInit {
     public auth: AuthService,
     private router: Router,
     private toastService: ToastService,
+    private cdr: ChangeDetectorRef,
   ) {}
 
   ngOnInit() {
     this.load();
+    setInterval(() => {
+      if (!this.showModal && !this.showDetailsModal) {
+        this.load();
+      }
+    }, 30000);
   }
 
   load() {
     this.loading = true;
+    console.log('🔄 Loading companies...');
+    
     this.service.getAll().subscribe({
       next: (data) => {
-        this.items = data;
-        this.filtered = data;
+        console.log('✅ Companies loaded:', data?.length || 0);
+        this.items = data || [];
+        this.filtered = [...this.items];
         this.loading = false;
+        this.cdr.detectChanges();
+        this.applyFilters();
       },
-      error: () => {
+      error: (err) => {
+        console.error('❌ Error loading companies:', err);
         this.loading = false;
-      },
+        this.items = [];
+        this.filtered = [];
+        this.cdr.detectChanges();
+        this.toastService.error('Erreur lors du chargement des entreprises');
+      }
     });
   }
-
-  // ─── Filter Panel ───────────────────────────────────────────────────────────
 
   openFilterPanel() {
     this.pendingCompanyIds = [...this.selectedCompanyIds];
@@ -151,8 +162,6 @@ export class CompaniesComponent implements OnInit {
   }
 
   closeFilterPanel() {
-    this.pendingCompanyIds = [...this.selectedCompanyIds];
-    this.pendingStatuses = [...this.selectedStatuses];
     this.showFilterPanel = false;
   }
 
@@ -223,9 +232,8 @@ export class CompaniesComponent implements OnInit {
         this.selectedStatuses.length === 0 || this.selectedStatuses.includes(item.status);
       return matchSearch && matchCompany && matchStatus;
     });
+    this.cdr.detectChanges();
   }
-
-  // ─── CRUD ───────────────────────────────────────────────────────────────────
 
   openCreate() {
     this.createMode = 'combined';
@@ -255,19 +263,16 @@ export class CompaniesComponent implements OnInit {
       status: item.status,
     };
     
-    // Charger la licence et les utilisateurs
     this.editingId = item.id;
     this.editing = true;
     this.editModalTab = 'company';
     this.errors = {};
     this.showModal = true;
     
-    // Charger la licence
     this.licenseService.getByCompany(item.id).subscribe({
       next: (license) => {
         this.editingLicense = license;
         if (!license) {
-          // Créer un formulaire de licence vide si aucune licence n'existe
           this.editingLicense = {
             planCode: 'BASIC',
             status: 'TRIAL',
@@ -285,26 +290,28 @@ export class CompaniesComponent implements OnInit {
             notes: '',
           };
         }
+        this.cdr.detectChanges();
       },
       error: () => {
         this.editingLicense = null;
+        this.cdr.detectChanges();
       }
     });
     
-    // Charger les utilisateurs
     this.superAdminService.getCompanyUsers(item.id).subscribe({
       next: (response) => {
         this.editingUsers = response.users || [];
+        this.cdr.detectChanges();
       },
       error: () => {
         this.editingUsers = [];
+        this.cdr.detectChanges();
       }
     });
   }
 
   save() {
     if (this.editing) {
-      // En mode édition, on sauvegarde selon l'onglet actif
       if (this.editModalTab === 'license') {
         this.saveEditLicense();
         return;
@@ -314,7 +321,6 @@ export class CompaniesComponent implements OnInit {
         return;
       }
 
-      // Onglet entreprise
       this.errors = validateRequired(this.form as any, ['name']);
       if (Object.keys(this.errors).length) return;
 
@@ -323,10 +329,12 @@ export class CompaniesComponent implements OnInit {
           this.showModal = false;
           this.load();
           this.toastService.success('Entreprise modifiée avec succès');
+          this.cdr.detectChanges();
         },
         error: (e: any) => {
           this.errors['api'] = e?.error?.error || 'Erreur serveur';
           this.toastService.error('Erreur lors de la modification');
+          this.cdr.detectChanges();
         },
       });
     } else {
@@ -339,10 +347,12 @@ export class CompaniesComponent implements OnInit {
             this.showModal = false;
             this.load();
             this.toastService.success('Entreprise créée avec succès');
+            this.cdr.detectChanges();
           },
           error: (e: any) => {
             this.errors['api'] = e?.error?.error || 'Erreur serveur';
             this.toastService.error('Erreur lors de la création');
+            this.cdr.detectChanges();
           },
         });
       } else {
@@ -354,10 +364,12 @@ export class CompaniesComponent implements OnInit {
             this.showModal = false;
             this.load();
             this.toastService.success('Entreprise, licence et utilisateurs créés avec succès');
+            this.cdr.detectChanges();
           },
           error: (e: any) => {
             this.errors['api'] = e?.error?.error || 'Erreur serveur';
             this.toastService.error('Erreur lors de la création');
+            this.cdr.detectChanges();
           },
         });
       }
@@ -370,14 +382,15 @@ export class CompaniesComponent implements OnInit {
       next: () => {
         this.load();
         this.toastService.success('Entreprise supprimée');
+        this.cdr.detectChanges();
       },
-      error: () => {
-        this.toastService.error('Erreur lors de la suppression');
+      error: (err) => {
+        console.error('Delete error:', err);
+        this.toastService.error(err?.error?.error || 'Erreur lors de la suppression');
+        this.cdr.detectChanges();
       },
     });
   }
-
-  // ─── Details Modal ──────────────────────────────────────────────────────────
 
   viewDetails(company: Company) {
     this.selectedCompany = company;
@@ -393,9 +406,11 @@ export class CompaniesComponent implements OnInit {
     this.licenseService.getByCompany(companyId).subscribe({
       next: (license) => {
         this.selectedLicense = license;
+        this.cdr.detectChanges();
       },
       error: () => {
         this.selectedLicense = null;
+        this.cdr.detectChanges();
       },
     });
   }
@@ -404,10 +419,12 @@ export class CompaniesComponent implements OnInit {
     this.selectedCompanyUsers = [];
     this.superAdminService.getCompanyUsers(companyId).subscribe({
       next: (response) => {
-        this.selectedCompanyUsers = response.users;
+        this.selectedCompanyUsers = response.users || [];
+        this.cdr.detectChanges();
       },
       error: () => {
         this.selectedCompanyUsers = [];
+        this.cdr.detectChanges();
       },
     });
   }
@@ -439,10 +456,12 @@ export class CompaniesComponent implements OnInit {
         this.toastService.update(loadingId, 'Entreprise modifiée avec succès', 'success', 4000);
         this.detailEditSection = '' as any;
         this.load();
+        this.cdr.detectChanges();
       },
       error: (e: any) => {
         this.toastService.update(loadingId, 'Erreur lors de la modification', 'error', 4000);
         this.errors['api'] = e?.error?.error || 'Erreur serveur';
+        this.cdr.detectChanges();
       },
     });
   }
@@ -461,27 +480,21 @@ export class CompaniesComponent implements OnInit {
       this.toastService.update(loadingId, 'Licence mise à jour avec succès', 'success', 4000);
       this.detailEditSection = '' as any;
       this.load();
+      this.cdr.detectChanges();
     };
     const onError = (e: any) => {
-      this.toastService.update(
-        loadingId,
-        'Erreur lors de la mise à jour de la licence',
-        'error',
-        4000,
-      );
+      this.toastService.update(loadingId, 'Erreur lors de la mise à jour de la licence', 'error', 4000);
       this.errors['api'] = e?.error?.error || 'Erreur serveur';
+      this.cdr.detectChanges();
     };
 
     if (this.selectedLicense?.id) {
-      this.licenseService
-        .update(this.selectedLicense.id, payload)
-        .subscribe({ next: onNext, error: onError });
+      this.licenseService.update(this.selectedLicense.id, payload).subscribe({ next: onNext, error: onError });
     } else {
       this.licenseService.create(payload).subscribe({ next: onNext, error: onError });
     }
   }
 
-  // Méthodes pour l'édition dans le modal principal
   saveEditLicense() {
     if (!this.editingLicense || !this.editingId) return;
 
@@ -495,15 +508,12 @@ export class CompaniesComponent implements OnInit {
     const onNext = () => {
       this.toastService.update(loadingId, 'Licence mise à jour avec succès', 'success', 4000);
       this.load();
+      this.cdr.detectChanges();
     };
     const onError = (e: any) => {
-      this.toastService.update(
-        loadingId,
-        'Erreur lors de la mise à jour de la licence',
-        'error',
-        4000,
-      );
+      this.toastService.update(loadingId, 'Erreur lors de la mise à jour de la licence', 'error', 4000);
       this.errors['api'] = e?.error?.error || 'Erreur serveur';
+      this.cdr.detectChanges();
     };
 
     if (this.editingLicense.id) {
@@ -533,11 +543,13 @@ export class CompaniesComponent implements OnInit {
         'users',
       ],
     });
+    this.cdr.detectChanges();
   }
 
   removeEditUser(index: number) {
     if (this.editingUsers.length > 0) {
       this.editingUsers.splice(index, 1);
+      this.cdr.detectChanges();
     }
   }
 
@@ -546,88 +558,56 @@ export class CompaniesComponent implements OnInit {
 
     const loadingId = this.toastService.loading('Modification des utilisateurs en cours...');
     
-    // Valider les utilisateurs
     const validUsers = this.editingUsers.filter((user) => {
-      const requiredOk =
-        user.firstName?.trim() &&
-        user.lastName?.trim() &&
-        user.email?.trim();
+      const requiredOk = user.firstName?.trim() && user.lastName?.trim() && user.email?.trim();
       const passwordOk = user.id ? true : !!user.password?.trim();
       return requiredOk && passwordOk;
     });
 
     if (validUsers.length === 0) {
-      this.toastService.update(
-        loadingId,
-        'Aucun utilisateur valide à sauvegarder (prénom/nom/email requis, et mot de passe requis pour un nouvel utilisateur)',
-        'error',
-        5000,
-      );
+      this.toastService.update(loadingId, 'Aucun utilisateur valide à sauvegarder...', 'error', 5000);
       return;
     }
 
-    // Créer ou mettre à jour chaque utilisateur
     let completed = 0;
     const total = validUsers.length;
 
     validUsers.forEach(user => {
-      const payload = {
-        ...user,
-        companyId: this.editingId,
+      const payload = { ...user, companyId: this.editingId };
+      const onComplete = () => {
+        completed++;
+        if (completed === total) {
+          this.toastService.update(loadingId, 'Utilisateurs sauvegardés avec succès', 'success', 4000);
+          this.load();
+          this.cdr.detectChanges();
+        }
+      };
+      const onFail = () => {
+        completed++;
+        if (completed === total) {
+          this.toastService.update(loadingId, 'Erreur lors de la sauvegarde des utilisateurs', 'error', 4000);
+          this.cdr.detectChanges();
+        }
       };
 
       if (user.id) {
-        // Mettre à jour l'utilisateur existant
-        this.userService.update(user.id, payload).subscribe({
-          next: () => {
-            completed++;
-            if (completed === total) {
-              this.toastService.update(loadingId, 'Utilisateurs mis à jour avec succès', 'success', 4000);
-              this.load();
-            }
-          },
-          error: () => {
-            completed++;
-            if (completed === total) {
-              this.toastService.update(loadingId, 'Erreur lors de la mise à jour des utilisateurs', 'error', 4000);
-            }
-          }
-        });
+        this.userService.update(user.id, payload).subscribe({ next: onComplete, error: onFail });
       } else {
-        // Créer un nouvel utilisateur
-        this.userService.create(payload).subscribe({
-          next: () => {
-            completed++;
-            if (completed === total) {
-              this.toastService.update(loadingId, 'Utilisateurs créés avec succès', 'success', 4000);
-              this.load();
-            }
-          },
-          error: () => {
-            completed++;
-            if (completed === total) {
-              this.toastService.update(loadingId, 'Erreur lors de la création des utilisateurs', 'error', 4000);
-            }
-          }
-        });
+        this.userService.create(payload).subscribe({ next: onComplete, error: onFail });
       }
     });
   }
 
   cancelCompanyEdit() {
-    console.log('Annulation des modifications entreprise');
-    // Fermer le panneau d'édition
     this.detailEditSection = '' as any;
-    // Afficher un message de succès pour l'annulation
     this.toastService.success('Modifications annulées avec succès', 3000);
+    this.cdr.detectChanges();
   }
 
   cancelLicenseEdit() {
-    console.log('Annulation des modifications licence');
-    // Fermer le panneau d'édition
     this.detailEditSection = '' as any;
-    // Afficher un message de succès pour l'annulation
     this.toastService.success('Modifications de la licence annulées avec succès', 3000);
+    this.cdr.detectChanges();
   }
 
   onDetailsUsers() {
@@ -668,9 +648,11 @@ export class CompaniesComponent implements OnInit {
         }
         this.toastService.success('Utilisateur modifié avec succès');
         this.selectedEditableUser = null;
+        this.cdr.detectChanges();
       },
       error: () => {
         this.toastService.error('Erreur lors de la modification de l’utilisateur');
+        this.cdr.detectChanges();
       },
     });
   }
@@ -683,18 +665,20 @@ export class CompaniesComponent implements OnInit {
           this.loadCompanyUsers(this.selectedCompany.id);
         }
         this.toastService.success('Utilisateur supprimé avec succès');
+        this.cdr.detectChanges();
       },
       error: () => {
-        this.toastService.error('Erreur lors de la suppression de l’utilisateur');
+        this.toastService.error('Erreur lors de la suppression');
+        this.cdr.detectChanges();
       },
     });
   }
 
-  // ─── Helpers ────────────────────────────────────────────────────────────────
-
   close() {
     this.showModal = false;
+    this.cdr.detectChanges();
   }
+
   hasError(f: string) {
     return !!this.errors[f];
   }
@@ -784,16 +768,13 @@ export class CompaniesComponent implements OnInit {
         if (!user.firstName?.trim()) errors[`users.${i}.firstName`] = 'Le prénom est obligatoire';
         if (!user.lastName?.trim()) errors[`users.${i}.lastName`] = 'Le nom est obligatoire';
         if (!user.email?.trim()) errors[`users.${i}.email`] = "L'email est obligatoire";
-        if (!user.password?.trim())
-          errors[`users.${i}.password`] = 'Le mot de passe est obligatoire';
+        if (!user.password?.trim()) errors[`users.${i}.password`] = 'Le mot de passe est obligatoire';
         if (!user.role) errors[`users.${i}.role`] = 'Le rôle est obligatoire';
       });
     }
 
     return errors;
   }
-
-  // ─── Permissions ────────────────────────────────────────────────────────────
 
   isUserPermChecked(user: any, key: string): boolean {
     return Array.isArray(user.permissions) && user.permissions.includes(key);
@@ -803,15 +784,15 @@ export class CompaniesComponent implements OnInit {
     if (!Array.isArray(user.permissions)) user.permissions = [];
     const idx = user.permissions.indexOf(key);
     idx >= 0 ? user.permissions.splice(idx, 1) : user.permissions.push(key);
+    this.cdr.detectChanges();
   }
 
   onUserRoleChange(user: any) {
     if (user.role && this.ROLE_PRESETS[user.role]) {
       user.permissions = [...this.ROLE_PRESETS[user.role]];
     }
+    this.cdr.detectChanges();
   }
-
-  // ─── Users (formulaire combiné) ─────────────────────────────────────────────
 
   addUser() {
     this.combinedForm.users.push({
@@ -833,21 +814,20 @@ export class CompaniesComponent implements OnInit {
         'users',
       ],
     });
+    this.cdr.detectChanges();
   }
 
   removeUser(index: number) {
     if (this.combinedForm.users.length > 1) {
       this.combinedForm.users.splice(index, 1);
+      this.cdr.detectChanges();
     }
   }
-
-  // ─── Password ───────────────────────────────────────────────────────────────
 
   generatePassword(userIndex: number, strength: 'basic' | 'strong') {
     const chars = {
       basic: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
-      strong:
-        'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?',
+      strong: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?',
     };
     const length = strength === 'strong' ? 16 : 10;
     let password = '';
@@ -855,13 +835,13 @@ export class CompaniesComponent implements OnInit {
       password += chars[strength][Math.floor(Math.random() * chars[strength].length)];
     }
     this.combinedForm.users[userIndex].password = password;
+    this.cdr.detectChanges();
   }
 
   togglePasswordVisibility(userIndex: number) {
     this.showPassword[userIndex] = !this.showPassword[userIndex];
+    this.cdr.detectChanges();
   }
-
-  // ─── Role and User Helper Methods ────────────────────────────────────────────
 
   roleBadgeClass(role: string): string {
     const map: Record<string, string> = {
@@ -897,367 +877,5 @@ export class CompaniesComponent implements OnInit {
       VIEWER: 'bi-eye',
     };
     return icons[role] ?? 'bi-person-fill';
-  }
-
-  // ─── Contract Generation ──────────────────────────────────────────────────────
-
-  generateContract() {
-    if (!this.selectedCompany) return;
-
-    const loadingId = this.toastService.loading('Génération du contrat en cours...');
-
-    try {
-      // Generate HTML contract
-      const contractHTML = this.createContractHTML();
-      
-      // Create and download PDF
-      this.downloadContractPDF(contractHTML, `Contrat_${this.selectedCompany.name}_${new Date().toISOString().split('T')[0]}.pdf`);
-      
-      this.toastService.update(loadingId, 'Contrat généré avec succès', 'success', 4000);
-    } catch (error) {
-      console.error('Contract generation error:', error);
-      this.toastService.update(
-        loadingId,
-        'Erreur lors de la génération du contrat',
-        'error',
-        4000,
-      );
-    }
-  }
-
-  generateCompanyContract(company: any) {
-    if (!company) return;
-
-    try {
-      // Generate HTML contract
-      const contractHTML = this.createCompanyContractHTML(company);
-      
-      // Create and download PDF
-      this.downloadContractPDF(contractHTML, `Contrat_Service_${company.name}_${new Date().toISOString().split('T')[0]}.pdf`);
-      
-      // Show success message
-      alert('Contrat de service généré avec succès!');
-    } catch (error) {
-      console.error('Company contract generation error:', error);
-      alert('Erreur lors de la génération du contrat de service');
-    }
-  }
-
-  private createCompanyContractHTML(company: any): string {
-    if (!company) return '';
-
-    const currentDate = new Date().toLocaleDateString('fr-FR');
-
-    return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <title>Contrat de Service - ${company.name}</title>
-      <style>
-        body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
-        .header { text-align: center; border-bottom: 3px solid #4f46e5; padding-bottom: 20px; margin-bottom: 30px; }
-        .company-info { background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0; }
-        .section { margin: 30px 0; }
-        .section-title { color: #4f46e5; font-size: 18px; font-weight: bold; margin-bottom: 15px; }
-        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        .info-item { margin: 5px 0; }
-        .info-label { font-weight: bold; color: #374151; }
-        .signature { margin-top: 50px; }
-        .signature-box { border: 1px solid #d1d5db; padding: 20px; margin: 20px 0; height: 80px; }
-        .footer { margin-top: 50px; text-align: center; color: #6b7280; font-size: 12px; }
-        .service-contract-title { color: #1f2937; font-size: 24px; font-weight: bold; text-align: center; margin-bottom: 10px; }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <div class="service-contract-title">CONTRAT DE SERVICE HRMatrix</div>
-        <h2>${company.name}</h2>
-        <p>Date: ${currentDate}</p>
-      </div>
-
-      <div class="company-info">
-        <div class="section-title">INFORMATIONS DE L'ENTREPRISE</div>
-        <div class="info-grid">
-          <div class="info-item">
-            <span class="info-label">Nom commercial:</span> ${company.name}
-          </div>
-          <div class="info-item">
-            <span class="info-label">Raison sociale:</span> ${company.legalName || 'N/A'}
-          </div>
-          <div class="info-item">
-            <span class="info-label">Email:</span> ${company.email || 'N/A'}
-          </div>
-          <div class="info-item">
-            <span class="info-label">Téléphone:</span> ${company.phone || 'N/A'}
-          </div>
-          <div class="info-item">
-            <span class="info-label">Adresse:</span> ${company.address || 'N/A'}
-          </div>
-          <div class="info-item">
-            <span class="info-label">Ville:</span> ${company.city || 'N/A'}
-          </div>
-          <div class="info-item">
-            <span class="info-label">Pays:</span> ${company.country || 'Maroc'}
-          </div>
-          <div class="info-item">
-            <span class="info-label">Devise:</span> ${company.currency || 'MAD'}
-          </div>
-          <div class="info-item">
-            <span class="info-label">Identifiant fiscal:</span> ${company.taxIdentifier || 'N/A'}
-          </div>
-          <div class="info-item">
-            <span class="info-label">Numéro RC:</span> ${company.rcNumber || 'N/A'}
-          </div>
-          <div class="info-item">
-            <span class="info-label">Numéro ICE:</span> ${company.iceNumber || 'N/A'}
-          </div>
-          <div class="info-item">
-            <span class="info-label">Numéro CNSS:</span> ${company.cnssNumber || 'N/A'}
-          </div>
-        </div>
-      </div>
-
-      <div class="section">
-        <div class="section-title">TERMES ET CONDITIONS</div>
-        <p>Ce contrat régit les conditions d'utilisation de la plateforme HRMatrix par l'entreprise ${company.name}.</p>
-        <ul>
-          <li>Les services sont fournis selon les termes de la licence souscrite.</li>
-          <li>L'entreprise s'engage à respecter les limites d'utilisation définies.</li>
-          <li>Les données de l'entreprise restent sa propriété exclusive.</li>
-          <li>La plateforme peut être résiliée en cas de non-respect des conditions.</li>
-          <li>Les tarifs sont sujets à changement selon le plan souscrit.</li>
-          <li>Le support technique est inclus selon le plan souscrit.</li>
-          <li>Les mises à jour logicielles sont incluses sans frais supplémentaires.</li>
-        </ul>
-      </div>
-
-      <div class="signature">
-        <div class="section-title">SIGNATURES</div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
-          <div>
-            <p><strong>Pour l'entreprise ${company.name}:</strong></p>
-            <div class="signature-box"></div>
-            <p>Nom et signature</p>
-            <p>Date: ${currentDate}</p>
-          </div>
-          <div>
-            <p><strong>Pour HRMatrix:</strong></p>
-            <div class="signature-box"></div>
-            <p>Nom et signature</p>
-            <p>Date: ${currentDate}</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="footer">
-        <p>Ce contrat de service a été généré automatiquement le ${currentDate} via la plateforme HRMatrix.</p>
-        <p>Pour toute question, contactez support@hrmatrix.ma | www.hrmatrix.ma</p>
-        <p>Tél: +212 5XX XXX XXX | Adresse: 123 Avenue Mohammed V, Casablanca</p>
-      </div>
-    </body>
-    </html>
-    `;
-  }
-
-  private createContractHTML(): string {
-    if (!this.selectedCompany) return '';
-
-    const currentDate = new Date().toLocaleDateString('fr-FR');
-    const license = this.selectedLicense || {};
-    const users = this.selectedCompanyUsers || [];
-
-    return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <title>Contrat de Service - ${this.selectedCompany.name}</title>
-      <style>
-        body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
-        .header { text-align: center; border-bottom: 3px solid #4f46e5; padding-bottom: 20px; margin-bottom: 30px; }
-        .company-info { background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0; }
-        .section { margin: 30px 0; }
-        .section-title { color: #4f46e5; font-size: 18px; font-weight: bold; margin-bottom: 15px; }
-        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        .info-item { margin: 5px 0; }
-        .info-label { font-weight: bold; color: #374151; }
-        .signature { margin-top: 50px; }
-        .signature-box { border: 1px solid #d1d5db; padding: 20px; margin: 20px 0; height: 80px; }
-        .footer { margin-top: 50px; text-align: center; color: #6b7280; font-size: 12px; }
-        .user-list { margin: 15px 0; }
-        .user-item { background: #f9fafb; padding: 10px; margin: 5px 0; border-radius: 4px; }
-        .badge { background: #4f46e5; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px; }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <h1>CONTRAT DE SERVICE</h1>
-        <h2>${this.selectedCompany.name}</h2>
-        <p>Date: ${currentDate}</p>
-      </div>
-
-      <div class="company-info">
-        <div class="section-title">INFORMATIONS DE L'ENTREPRISE</div>
-        <div class="info-grid">
-          <div class="info-item">
-            <span class="info-label">Nom commercial:</span> ${this.selectedCompany.name}
-          </div>
-          <div class="info-item">
-            <span class="info-label">Raison sociale:</span> ${this.selectedCompany.legalName || 'N/A'}
-          </div>
-          <div class="info-item">
-            <span class="info-label">Email:</span> ${this.selectedCompany.email || 'N/A'}
-          </div>
-          <div class="info-item">
-            <span class="info-label">Téléphone:</span> ${this.selectedCompany.phone || 'N/A'}
-          </div>
-          <div class="info-item">
-            <span class="info-label">Adresse:</span> ${this.selectedCompany.address || 'N/A'}
-          </div>
-          <div class="info-item">
-            <span class="info-label">Ville:</span> ${this.selectedCompany.city || 'N/A'}
-          </div>
-          <div class="info-item">
-            <span class="info-label">Pays:</span> ${this.selectedCompany.country || 'Maroc'}
-          </div>
-          <div class="info-item">
-            <span class="info-label">Devise:</span> ${this.selectedCompany.currency || 'MAD'}
-          </div>
-          <div class="info-item">
-            <span class="info-label">Identifiant fiscal:</span> ${this.selectedCompany.taxIdentifier || 'N/A'}
-          </div>
-          <div class="info-item">
-            <span class="info-label">Numéro RC:</span> ${this.selectedCompany.rcNumber || 'N/A'}
-          </div>
-          <div class="info-item">
-            <span class="info-label">Numéro ICE:</span> ${this.selectedCompany.iceNumber || 'N/A'}
-          </div>
-          <div class="info-item">
-            <span class="info-label">Numéro CNSS:</span> ${this.selectedCompany.cnssNumber || 'N/A'}
-          </div>
-        </div>
-      </div>
-
-      <div class="section">
-        <div class="section-title">DÉTAILS DE LA LICENCE</div>
-        <div class="info-grid">
-          <div class="info-item">
-            <span class="info-label">Plan:</span> <span class="badge">${license.planCode || 'BASIC'}</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">Statut:</span> <span class="badge">${license.status || 'TRIAL'}</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">Cycle de facturation:</span> ${license.billingCycle || 'MONTHLY'}
-          </div>
-          <div class="info-item">
-            <span class="info-label">Date de début:</span> ${license.startsAt ? new Date(license.startsAt).toLocaleDateString('fr-FR') : 'N/A'}
-          </div>
-          <div class="info-item">
-            <span class="info-label">Date de fin:</span> ${license.endsAt ? new Date(license.endsAt).toLocaleDateString('fr-FR') : 'Illimitée'}
-          </div>
-          <div class="info-item">
-            <span class="info-label">Max utilisateurs:</span> ${license.maxUsers || 'Illimité'}
-          </div>
-          <div class="info-item">
-            <span class="info-label">Max employés:</span> ${license.maxEmployees || 'Illimité'}
-          </div>
-          <div class="info-item">
-            <span class="info-label">Max stockage:</span> ${license.maxStorageMb ? license.maxStorageMb + ' Mo' : 'Illimité'}
-          </div>
-        </div>
-        
-        <div style="margin-top: 20px;">
-          <span class="info-label">Fonctionnalités activées:</span>
-          <div style="margin-top: 10px;">
-            ${license.payrollEnabled ? '<span class="badge" style="margin-right: 5px;">Paie</span>' : ''}
-            ${license.rhEnabled ? '<span class="badge" style="margin-right: 5px;">RH</span>' : ''}
-            ${license.cnssEnabled ? '<span class="badge" style="margin-right: 5px;">CNSS</span>' : ''}
-            ${license.taxEnabled ? '<span class="badge" style="margin-right: 5px;">Fiscal</span>' : ''}
-            ${license.damancomEnabled ? '<span class="badge" style="margin-right: 5px;">Damancom</span>' : ''}
-          </div>
-        </div>
-      </div>
-
-      <div class="section">
-        <div class="section-title">UTILISATEURS AUTORISÉS (${users.length})</div>
-        <div class="user-list">
-          ${users.map(user => `
-            <div class="user-item">
-              <strong>${user.firstName} ${user.lastName}</strong> - ${user.email}
-              <span class="badge" style="margin-left: 10px;">${user.role}</span>
-              <span class="badge" style="margin-left: 5px; background: ${user.status === 'ACTIVE' ? '#16a34a' : '#f59e0b'};">${user.status}</span>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-
-      <div class="section">
-        <div class="section-title">TERMES ET CONDITIONS</div>
-        <p>Ce contrat régit les conditions d'utilisation de la plateforme HRMatrix par l'entreprise ${this.selectedCompany.name}.</p>
-        <ul>
-          <li>Les services sont fournis selon les termes de la licence spécifiée ci-dessus.</li>
-          <li>L'entreprise s'engage à respecter les limites d'utilisation définies.</li>
-          <li>Les données de l'entreprise restent sa propriété exclusive.</li>
-          <li>La plateforme peut être résiliée en cas de non-respect des conditions.</li>
-          <li>Les tarifs sont sujets à changement selon le plan souscrit.</li>
-        </ul>
-      </div>
-
-      <div class="signature">
-        <div class="section-title">SIGNATURES</div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
-          <div>
-            <p><strong>Pour l'entreprise ${this.selectedCompany.name}:</strong></p>
-            <div class="signature-box"></div>
-            <p>Nom et signature</p>
-            <p>Date: ${currentDate}</p>
-          </div>
-          <div>
-            <p><strong>Pour HRMatrix:</strong></p>
-            <div class="signature-box"></div>
-            <p>Nom et signature</p>
-            <p>Date: ${currentDate}</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="footer">
-        <p>Ce contrat a été généré automatiquement le ${currentDate} via la plateforme HRMatrix.</p>
-        <p>Pour toute question, contactez support@hrmatrix.ma</p>
-      </div>
-    </body>
-    </html>
-    `;
-  }
-
-  private downloadContractPDF(html: string, filename: string) {
-    // Create a temporary window to generate the content
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(html);
-      printWindow.document.close();
-      
-      // Wait for content to load, then trigger print
-      setTimeout(() => {
-        printWindow.print();
-        // Close the window after printing (or after user cancels)
-        setTimeout(() => {
-          printWindow.close();
-        }, 1000);
-      }, 500);
-    } else {
-      // Fallback: create a downloadable HTML file
-      const blob = new Blob([html], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename.replace('.pdf', '.html');
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }
   }
 }

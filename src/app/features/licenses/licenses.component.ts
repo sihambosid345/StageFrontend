@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
@@ -8,6 +8,7 @@ import {
   License, Company,
   LicensePlanCode, LicenseStatus, BillingCycle,
 } from '../../core/models';
+import { ToastService } from '../../core/services/toast.service';
 
 type FormErrors = Record<string, string>;
 
@@ -61,6 +62,8 @@ export class LicensesComponent implements OnInit {
     private superAdminService: SuperAdminService,
     public auth: AuthService,
     private route: ActivatedRoute,
+    private toastService: ToastService,
+    private cdr: ChangeDetectorRef,
   ) {}
 
   ngOnInit() {
@@ -73,28 +76,52 @@ export class LicensesComponent implements OnInit {
         this.openCreate();
       }
     });
+    // Auto-refresh every 30 seconds
+    setInterval(() => {
+      if (!this.showModal && !this.showFilterPanel) {
+        this.load();
+      }
+    }, 30000);
   }
 
   loadCompanies() {
     this.companyService.getAll().subscribe({
-      next: (data) => { this.companies = data; },
-      error: () => {}
+      next: (data) => { 
+        this.companies = data || []; 
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        console.error('Error loading companies:', err);
+        this.cdr.detectChanges();
+      }
     });
   }
 
   companyName(id: string): string {
-    return this.companies.find(c => c.id === id)?.name ?? id;
+    const company = this.companies.find(c => c.id === id);
+    return company?.name ?? id;
   }
 
   load() {
     this.loading = true;
+    console.log('🔄 Loading licenses...');
+    
     this.service.getAll().subscribe({
       next: (data) => { 
-        this.items = this.updateExpiredLicenses(data); 
+        console.log('✅ Licenses loaded:', data?.length || 0);
+        this.items = this.updateExpiredLicenses(data || []); 
         this.applyFilters(); 
-        this.loading = false; 
+        this.loading = false;
+        this.cdr.detectChanges();
       },
-      error: () => { this.loading = false; }
+      error: (err) => {
+        console.error('❌ Error loading licenses:', err);
+        this.loading = false;
+        this.items = [];
+        this.filtered = [];
+        this.cdr.detectChanges();
+        this.toastService?.error('Erreur lors du chargement des licences');
+      }
     });
   }
 
@@ -103,20 +130,15 @@ export class LicensesComponent implements OnInit {
    */
   private updateExpiredLicenses(licenses: License[]): License[] {
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Début de la journée pour comparaison
+    today.setHours(0, 0, 0, 0);
     
     return licenses.map(license => {
-      // Si la licence a une date de fin et n'est pas déjà expirée
       if (license.endsAt && license.status !== 'EXPIRED' && license.status !== 'CANCELLED') {
         const endDate = new Date(license.endsAt);
-        endDate.setHours(0, 0, 0, 0); // Début de la journée pour comparaison
+        endDate.setHours(0, 0, 0, 0);
         
-        // Si la date de fin est avant aujourd'hui
         if (endDate < today) {
-          // Mettre à jour le statut côté backend
           this.updateLicenseStatus(license.id, 'EXPIRED');
-          
-          // Retourner la licence avec le statut mis à jour pour l'affichage
           return { ...license, status: 'EXPIRED' };
         }
       }
@@ -130,10 +152,10 @@ export class LicensesComponent implements OnInit {
   private updateLicenseStatus(licenseId: string, newStatus: LicenseStatus) {
     this.service.update(licenseId, { status: newStatus }).subscribe({
       next: () => {
-        console.log(`Licence ${licenseId} mise à jour: ${newStatus}`);
+        console.log(`✅ Licence ${licenseId} mise à jour: ${newStatus}`);
       },
       error: (err) => {
-        console.error(`Erreur lors de la mise à jour de la licence ${licenseId}:`, err);
+        console.error(`❌ Erreur mise à jour licence ${licenseId}:`, err);
       }
     });
   }
@@ -152,6 +174,8 @@ export class LicensesComponent implements OnInit {
       const matchesPlan = this.planFilter ? i.planCode === this.planFilter : true;
       return matchesSearch && matchesCompany && matchesStatus && matchesPlan;
     });
+    console.log(`🔍 Filtered licenses: ${this.filtered.length} / ${this.items.length}`);
+    this.cdr.detectChanges();
   }
 
   clearCompanyFilter() {
@@ -178,10 +202,12 @@ export class LicensesComponent implements OnInit {
 
   closeFilterPanel() {
     this.showFilterPanel = false;
+    this.cdr.detectChanges();
   }
 
   togglePendingCompanySelection(companyId: string) {
     this.pendingCompanyId = this.pendingCompanyId === companyId ? '' : companyId;
+    this.cdr.detectChanges();
   }
 
   isPendingCompanySelected(companyId: string): boolean {
@@ -190,10 +216,20 @@ export class LicensesComponent implements OnInit {
 
   togglePendingStatusSelection(status: LicenseStatus) {
     this.pendingStatus = this.pendingStatus === status ? '' : status;
+    this.cdr.detectChanges();
+  }
+
+  isPendingStatusSelected(status: LicenseStatus): boolean {
+    return this.pendingStatus === status;
   }
 
   togglePendingPlanSelection(plan: LicensePlanCode) {
     this.pendingPlan = this.pendingPlan === plan ? '' : plan;
+    this.cdr.detectChanges();
+  }
+
+  isPendingPlanSelected(plan: LicensePlanCode): boolean {
+    return this.pendingPlan === plan;
   }
 
   applyPendingFilters() {
@@ -202,19 +238,28 @@ export class LicensesComponent implements OnInit {
     this.planFilter = this.pendingPlan;
     this.applyFilters();
     this.showFilterPanel = false;
+    this.cdr.detectChanges();
   }
 
   resetPendingFilters() {
     this.pendingCompanyId = '';
     this.pendingStatus = '';
     this.pendingPlan = '';
+    this.cdr.detectChanges();
   }
 
-  get isSuperAdmin(): boolean { return this.auth.isSuperAdmin(); }
-  get currentCompanyId(): string { return this.auth.currentUser()?.companyId ?? ''; }
+  get isSuperAdmin(): boolean { 
+    return this.auth.isSuperAdmin(); 
+  }
+  
+  get currentCompanyId(): string { 
+    return this.auth.currentUser()?.companyId ?? ''; 
+  }
+  
   get currentCompanyName(): string {
     const id = this.currentCompanyId;
-    return this.companies.find(c => c.id === id)?.name ?? 'Entreprise assignée automatiquement';
+    const company = this.companies.find(c => c.id === id);
+    return company?.name ?? 'Entreprise assignée automatiquement';
   }
 
   openCreate() {
@@ -225,8 +270,11 @@ export class LicensesComponent implements OnInit {
     if (!this.isSuperAdmin) {
       this.form.companyId = this.currentCompanyId;
     }
-    this.editing = false; this.editingId = ''; this.errors = {};
+    this.editing = false; 
+    this.editingId = ''; 
+    this.errors = {};
     this.showModal = true;
+    this.cdr.detectChanges();
   }
 
   openEdit(item: License) {
@@ -247,8 +295,11 @@ export class LicensesComponent implements OnInit {
       damancomEnabled: item.damancomEnabled,
       notes:           item.notes ?? '',
     };
-    this.editing = true; this.editingId = item.id; this.errors = {};
+    this.editing = true; 
+    this.editingId = item.id; 
+    this.errors = {};
     this.showModal = true;
+    this.cdr.detectChanges();
   }
 
   save() {
@@ -257,13 +308,29 @@ export class LicensesComponent implements OnInit {
     }
 
     this.errors = validateRequired(this.form, ['companyId', 'planCode', 'startsAt']);
-    if (Object.keys(this.errors).length) return;
+    if (Object.keys(this.errors).length) {
+      this.cdr.detectChanges();
+      return;
+    }
 
+    const loadingId = this.toastService?.loading('Sauvegarde en cours...');
+    
     const next = () => { 
       this.showModal = false; 
-      this.load(); // Recharge avec vérification des licences expirées
+      this.load();
+      this.cdr.detectChanges();
+      if (this.toastService) {
+        this.toastService.update(loadingId, this.editing ? 'Licence modifiée avec succès' : 'Licence créée avec succès', 'success', 4000);
+      }
     };
-    const error = (e: any) => { this.errors['api'] = e?.error?.error || 'Erreur serveur'; };
+    
+    const error = (e: any) => { 
+      this.errors['api'] = e?.error?.error || 'Erreur serveur';
+      this.cdr.detectChanges();
+      if (this.toastService) {
+        this.toastService.update(loadingId, this.errors['api'], 'error', 4000);
+      }
+    };
 
     if (this.editing) {
       this.service.update(this.editingId, this.form).subscribe({ next, error });
@@ -274,32 +341,57 @@ export class LicensesComponent implements OnInit {
 
   delete(id: string) {
     if (!confirm('Supprimer cette licence ?')) return;
-    this.service.delete(id).subscribe({ next: () => this.load() });
+    
+    this.service.delete(id).subscribe({ 
+      next: () => {
+        this.load();
+        this.toastService?.success('Licence supprimée avec succès');
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        console.error('Delete error:', err);
+        this.toastService?.error(err?.error?.error || 'Erreur lors de la suppression');
+        this.cdr.detectChanges();
+      }
+    });
   }
 
-  close() { this.showModal = false; }
-  hasError(f: string) { return !!this.errors[f]; }
+  close() { 
+    this.showModal = false; 
+    this.cdr.detectChanges();
+  }
+  
+  hasError(f: string) { 
+    return !!this.errors[f]; 
+  }
 
   getPlanBadgeClass(planCode: string): string {
     const map: Record<string, string> = {
-      'BASIC': 'bg-secondary', 'PRO': 'bg-info',
-      'BUSINESS': 'bg-warning text-dark', 'ENTERPRISE': 'bg-danger'
+      'BASIC': 'badge-secondary', 
+      'PRO': 'badge-info',
+      'BUSINESS': 'badge-warning', 
+      'ENTERPRISE': 'badge-danger'
     };
-    return map[planCode] || 'bg-secondary';
+    return map[planCode] || 'badge-secondary';
   }
 
   getStatusBadgeClass(status: string): string {
     const map: Record<string, string> = {
-      'TRIAL': 'bg-warning text-dark', 'ACTIVE': 'bg-success',
-      'EXPIRED': 'bg-danger', 'SUSPENDED': 'bg-secondary', 'CANCELLED': 'bg-dark'
+      'TRIAL': 'badge-warning', 
+      'ACTIVE': 'badge-success',
+      'EXPIRED': 'badge-danger', 
+      'SUSPENDED': 'badge-secondary', 
+      'CANCELLED': 'badge-dark'
     };
-    return map[status] || 'bg-secondary';
+    return map[status] || 'badge-secondary';
   }
 
   getStatusIcon(status: string): string {
     const map: Record<string, string> = {
-      'TRIAL': 'bi-clock', 'ACTIVE': 'bi-check-circle-fill',
-      'EXPIRED': 'bi-x-circle-fill', 'SUSPENDED': 'bi-pause-circle-fill',
+      'TRIAL': 'bi-clock', 
+      'ACTIVE': 'bi-check-circle-fill',
+      'EXPIRED': 'bi-x-circle-fill', 
+      'SUSPENDED': 'bi-pause-circle-fill',
       'CANCELLED': 'bi-x-octagon-fill'
     };
     return map[status] || 'bi-question-circle';
@@ -307,11 +399,20 @@ export class LicensesComponent implements OnInit {
 
   private emptyForm(): any {
     return {
-      companyId: '', planCode: 'BASIC', status: 'TRIAL',
-      billingCycle: 'MONTHLY', startsAt: '', endsAt: '',
-      maxUsers: null, maxEmployees: null, maxStorageMb: null,
-      payrollEnabled: true, rhEnabled: true,
-      cnssEnabled: false, taxEnabled: false, damancomEnabled: false,
+      companyId: '', 
+      planCode: 'BASIC', 
+      status: 'TRIAL',
+      billingCycle: 'MONTHLY', 
+      startsAt: '', 
+      endsAt: '',
+      maxUsers: null, 
+      maxEmployees: null, 
+      maxStorageMb: null,
+      payrollEnabled: true, 
+      rhEnabled: true,
+      cnssEnabled: false, 
+      taxEnabled: false, 
+      damancomEnabled: false,
       notes: '',
     };
   }

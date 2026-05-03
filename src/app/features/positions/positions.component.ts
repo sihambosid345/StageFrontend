@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { forkJoin } from 'rxjs';
@@ -46,29 +46,44 @@ export class PositionsComponent implements OnInit {
     private companyService: CompanyService,
     private deptService: DepartmentService,
     private auth: AuthService,
+    private cdr: ChangeDetectorRef,
   ) {}
 
   ngOnInit() {
     this.loadData();
+    // Auto-refresh every 30 seconds
+    setInterval(() => {
+      if (!this.showModal && !this.showFilterPanel) {
+        this.loadData();
+      }
+    }, 30000);
   }
   
   loadData() {
     this.loading = true;
+    console.log('🔄 Loading positions...');
+    
     forkJoin({
       positions:   this.service.getAll(),
       companies:   this.companyService.getAll(),
       departments: this.deptService.getAll(),
     }).subscribe({
       next: (d) => {
-        this.items       = d.positions;
-        this.filtered    = d.positions;
-        this.companies   = d.companies;
-        this.departments = d.departments;
+        console.log('✅ Positions loaded:', d.positions?.length || 0);
+        this.items       = d.positions || [];
+        this.filtered    = [...this.items];
+        this.companies   = d.companies || [];
+        this.departments = d.departments || [];
         this.loading     = false;
-        this.applyFilters(); // ✅ Appliquer les filtres après chargement
+        this.cdr.detectChanges();
+        this.applyFilters();
       },
-      error: () => { 
-        this.loading = false; 
+      error: (err) => { 
+        console.error('❌ Error loading positions:', err);
+        this.loading = false;
+        this.items = [];
+        this.filtered = [];
+        this.cdr.detectChanges();
       }
     });
   }
@@ -76,9 +91,15 @@ export class PositionsComponent implements OnInit {
   load() {
     this.service.getAll().subscribe({
       next: (data) => { 
-        this.items = data; 
+        console.log('✅ Reloaded positions:', data?.length || 0);
+        this.items = data || []; 
         this.applyFilters(); 
+        this.cdr.detectChanges();
       },
+      error: (err) => {
+        console.error('❌ Error reloading positions:', err);
+        this.cdr.detectChanges();
+      }
     });
   }
 
@@ -95,6 +116,7 @@ export class PositionsComponent implements OnInit {
 
   closeFilterPanel() {
     this.showFilterPanel = false;
+    this.cdr.detectChanges();
   }
 
   selectPendingCompany(companyId: string) {
@@ -102,14 +124,29 @@ export class PositionsComponent implements OnInit {
     if (this.pendingCompanyId !== companyId) {
       this.pendingDepartmentId = '';
     }
+    this.cdr.detectChanges();
+  }
+
+  isPendingCompanySelected(companyId: string): boolean {
+    return this.pendingCompanyId === companyId;
   }
 
   selectPendingDepartment(departmentId: string) {
     this.pendingDepartmentId = this.pendingDepartmentId === departmentId ? '' : departmentId;
+    this.cdr.detectChanges();
+  }
+
+  isPendingDepartmentSelected(departmentId: string): boolean {
+    return this.pendingDepartmentId === departmentId;
   }
 
   selectPendingActivity(activity: string) {
     this.pendingActivity = this.pendingActivity === activity ? '' : activity;
+    this.cdr.detectChanges();
+  }
+
+  isPendingActivitySelected(activity: string): boolean {
+    return this.pendingActivity === activity;
   }
 
   applyPendingFilters() {
@@ -118,27 +155,32 @@ export class PositionsComponent implements OnInit {
     this.activityFilter = this.pendingActivity;
     this.applyFilters();
     this.showFilterPanel = false;
+    this.cdr.detectChanges();
   }
 
   resetPendingFilters() {
     this.pendingCompanyId = '';
     this.pendingDepartmentId = '';
     this.pendingActivity = '';
+    this.cdr.detectChanges();
   }
 
   removeSelectedCompany() {
     this.companyFilterId = '';
     this.applyFilters();
+    this.cdr.detectChanges();
   }
 
   removeSelectedDepartment() {
     this.departmentFilterId = '';
     this.applyFilters();
+    this.cdr.detectChanges();
   }
 
   removeSelectedActivity() {
     this.activityFilter = '';
     this.applyFilters();
+    this.cdr.detectChanges();
   }
 
   applyFilters() {
@@ -151,6 +193,8 @@ export class PositionsComponent implements OnInit {
       const matchesActivity = this.activityFilter ? String(i.isActive) === this.activityFilter : true;
       return matchesSearch && matchesCompany && matchesDepartment && matchesActivity;
     });
+    console.log(`🔍 Filtered positions: ${this.filtered.length} / ${this.items.length}`);
+    this.cdr.detectChanges();
   }
 
   get isSuperAdmin(): boolean {
@@ -169,10 +213,17 @@ export class PositionsComponent implements OnInit {
   openCreate() {
     this.form = {
       companyId: this.isSuperAdmin ? '' : this.currentCompanyId,
-      name: '', departmentId: '', code: '', description: '', isActive: true
+      name: '', 
+      departmentId: '', 
+      code: '', 
+      description: '', 
+      isActive: true
     };
-    this.editing = false; this.editingId = ''; this.errors = {};
+    this.editing = false; 
+    this.editingId = ''; 
+    this.errors = {};
     this.showModal = true;
+    this.cdr.detectChanges();
   }
 
   openEdit(item: Position) {
@@ -184,8 +235,11 @@ export class PositionsComponent implements OnInit {
       description:  item.description  ?? '',
       isActive:     item.isActive,
     };
-    this.editing = true; this.editingId = item.id; this.errors = {};
+    this.editing = true; 
+    this.editingId = item.id; 
+    this.errors = {};
     this.showModal = true;
+    this.cdr.detectChanges();
   }
 
   save() {
@@ -194,7 +248,10 @@ export class PositionsComponent implements OnInit {
     }
 
     this.errors = validateRequired(this.form as any, ['companyId', 'name']);
-    if (Object.keys(this.errors).length) return;
+    if (Object.keys(this.errors).length) {
+      this.cdr.detectChanges();
+      return;
+    }
 
     const payload = { ...this.form };
     if (!payload.departmentId) delete payload.departmentId;
@@ -207,16 +264,28 @@ export class PositionsComponent implements OnInit {
       next: () => { 
         this.showModal = false; 
         this.load(); 
+        this.cdr.detectChanges();
       },
       error: (e) => { 
         this.errors['api'] = e?.error?.error || 'Erreur serveur'; 
+        this.cdr.detectChanges();
       }
     });
   }
 
   delete(id: string) {
     if (!confirm('Supprimer ce poste ?')) return;
-    this.service.delete(id).subscribe(() => this.load());
+    this.service.delete(id).subscribe({
+      next: () => {
+        this.load();
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        console.error('Delete error:', err);
+        alert(err?.error?.error || 'Erreur lors de la suppression');
+        this.cdr.detectChanges();
+      }
+    });
   }
 
   /** Départements filtrés selon la company sélectionnée dans le formulaire */
@@ -233,16 +302,25 @@ export class PositionsComponent implements OnInit {
   /** Réinitialise le département si on change d'entreprise */
   onCompanyChange() { 
     this.form.departmentId = ''; 
+    this.cdr.detectChanges();
   }
 
-  companyName(id: string)    { 
-    return this.companies.find(c => c.id === id)?.name ?? id; 
+  companyName(id: string): string { 
+    const company = this.companies.find(c => c.id === id);
+    return company?.name ?? id; 
   }
   
-  departmentName(id: string) { 
-    return this.departments.find(d => d.id === id)?.name ?? '—'; 
+  departmentName(id: string): string { 
+    const dept = this.departments.find(d => d.id === id);
+    return dept?.name ?? '—'; 
   }
 
-  close()             { this.showModal = false; }
-  hasError(f: string) { return !!this.errors[f]; }
+  close() { 
+    this.showModal = false; 
+    this.cdr.detectChanges();
+  }
+  
+  hasError(f: string): boolean { 
+    return !!this.errors[f]; 
+  }
 }

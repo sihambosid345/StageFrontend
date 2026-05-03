@@ -1,8 +1,8 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { RouterModule } from '@angular/router';
 import { forkJoin, of } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { catchError, finalize } from 'rxjs/operators';
 import {
   Attendance,
   Company,
@@ -105,41 +105,175 @@ export class DashboardComponent implements OnInit {
     private userService: UserService,
     private superAdminService: SuperAdminService,
     public auth: AuthService,
+    private cdr: ChangeDetectorRef,
   ) {}
 
   ngOnInit(): void {
+    this.loadDashboardData();
+  }
+
+  loadDashboardData(): void {
+    this.loading = true;
+    console.log('🔄 Loading dashboard data...');
+    
     const isSuperAdmin = this.auth.isSuperAdmin();
     const canManageUsers = this.auth.isAdmin();
 
-    forkJoin({
-      employees: this.employeeService.getAll().pipe(catchError(() => of([]))),
-      departments: this.departmentService.getAll().pipe(catchError(() => of([]))),
-      companies: this.companyService.getAll().pipe(catchError(() => of([]))),
-      attendances: this.attendanceService.getAll().pipe(catchError(() => of([]))),
-      contracts: this.contractService.getAll().pipe(catchError(() => of([]))),
-      variableItems: this.variableItemService.getAll().pipe(catchError(() => of([]))),
-      licenses: isSuperAdmin ? this.licenseService.getAll().pipe(catchError(() => of([]))) : of([]),
-      users: canManageUsers ? this.userService.getAll().pipe(catchError(() => of([]))) : of([]),
-      superAdminStats: isSuperAdmin
-        ? this.superAdminService.getDashboardStats().pipe(catchError(() => of(null)))
-        : of(null),
-    }).subscribe({
-      next: (data) => {
-        this.employees = data.employees;
-        this.departments = data.departments;
-        this.companies = data.companies;
-        this.attendances = data.attendances;
-        this.contracts = data.contracts;
-        this.variableItems = data.variableItems;
-        this.licenses = data.licenses;
-        this.users = data.users;
-        this.superAdminStats = data.superAdminStats;
-        this.loading = false;
-      },
-      error: () => {
-        this.loading = false;
-      },
+    // Appeler chaque service individuellement pour éviter les problèmes de forkJoin
+    this.employeeService.getAll().pipe(
+      catchError(err => {
+        console.error('Error loading employees:', err);
+        return of([]);
+      })
+    ).subscribe(employees => {
+      this.employees = employees;
+      console.log(`✅ Employees loaded: ${employees.length}`);
+      this.cdr.detectChanges();
+      this.checkLoadingComplete();
     });
+
+    this.departmentService.getAll().pipe(
+      catchError(err => {
+        console.error('Error loading departments:', err);
+        return of([]);
+      })
+    ).subscribe(departments => {
+      this.departments = departments;
+      console.log(`✅ Departments loaded: ${departments.length}`);
+      this.cdr.detectChanges();
+      this.checkLoadingComplete();
+    });
+
+    this.companyService.getAll().pipe(
+      catchError(err => {
+        console.error('Error loading companies:', err);
+        return of([]);
+      })
+    ).subscribe(companies => {
+      this.companies = companies;
+      console.log(`✅ Companies loaded: ${companies.length}`);
+      this.cdr.detectChanges();
+      this.checkLoadingComplete();
+    });
+
+    this.attendanceService.getAll().pipe(
+      catchError(err => {
+        console.error('Error loading attendances:', err);
+        return of([]);
+      })
+    ).subscribe(attendances => {
+      this.attendances = attendances;
+      console.log(`✅ Attendances loaded: ${attendances.length}`);
+      this.cdr.detectChanges();
+      this.checkLoadingComplete();
+    });
+
+    this.contractService.getAll().pipe(
+      catchError(err => {
+        console.error('Error loading contracts:', err);
+        return of([]);
+      })
+    ).subscribe(contracts => {
+      this.contracts = contracts;
+      console.log(`✅ Contracts loaded: ${contracts.length}`);
+      this.cdr.detectChanges();
+      this.checkLoadingComplete();
+    });
+
+    this.variableItemService.getAll().pipe(
+      catchError(err => {
+        console.error('Error loading variable items:', err);
+        return of([]);
+      })
+    ).subscribe(variableItems => {
+      this.variableItems = variableItems;
+      console.log(`✅ Variable items loaded: ${variableItems.length}`);
+      this.cdr.detectChanges();
+      this.checkLoadingComplete();
+    });
+
+    if (isSuperAdmin) {
+      this.licenseService.getAll().pipe(
+        catchError(err => {
+          console.error('Error loading licenses:', err);
+          return of([]);
+        })
+      ).subscribe(licenses => {
+        this.licenses = licenses;
+        console.log(`✅ Licenses loaded: ${licenses.length}`);
+        this.cdr.detectChanges();
+        this.checkLoadingComplete();
+      });
+
+      this.superAdminService.getDashboardStats().pipe(
+        catchError(err => {
+          console.error('Error loading dashboard stats:', err);
+          return of(null);
+        })
+      ).subscribe(stats => {
+        this.superAdminStats = stats;
+        console.log('✅ Dashboard stats loaded:', stats);
+        this.cdr.detectChanges();
+        this.checkLoadingComplete();
+      });
+    }
+
+    if (canManageUsers) {
+      this.userService.getAll().pipe(
+        catchError(err => {
+          console.error('Error loading users:', err);
+          return of([]);
+        })
+      ).subscribe(users => {
+        this.users = users;
+        console.log(`✅ Users loaded: ${users.length}`);
+        this.cdr.detectChanges();
+        this.checkLoadingComplete();
+      });
+    }
+
+    // Timeout pour forcer l'arrêt du chargement si quelque chose bloque
+    setTimeout(() => {
+      if (this.loading) {
+        console.warn('⚠️ Loading timeout - forcing loading to false');
+        this.loading = false;
+        this.cdr.detectChanges();
+      }
+    }, 10000);
+  }
+
+  // Compteur pour suivre le chargement des données
+  private loadedCount = 0;
+  private totalCalls = 0;
+
+  private checkLoadingComplete(): void {
+    const isSuperAdmin = this.auth.isSuperAdmin();
+    const canManageUsers = this.auth.isAdmin();
+    
+    // Calculer le nombre total d'appels attendus
+    let expectedCalls = 6; // employees, departments, companies, attendances, contracts, variableItems
+    
+    if (isSuperAdmin) {
+      expectedCalls += 2; // licenses, superAdminStats
+    }
+    if (canManageUsers) {
+      expectedCalls += 1; // users
+    }
+    
+    this.totalCalls = expectedCalls;
+    this.loadedCount++;
+    
+    console.log(`📊 Progress: ${this.loadedCount}/${this.totalCalls} loaded`);
+    
+    if (this.loadedCount >= this.totalCalls) {
+      this.loading = false;
+      console.log('✅ All dashboard data loaded successfully!');
+      this.cdr.detectChanges();
+      
+      // Reset counters
+      this.loadedCount = 0;
+      this.totalCalls = 0;
+    }
   }
 
   get heroTitle(): string {
@@ -248,10 +382,6 @@ export class DashboardComponent implements OnInit {
 
     return cards;
   }
-
-  // ═══════════════════════════════════════════════════════
-  // CHART DATA - VIBRANT COLORS
-  // ═══════════════════════════════════════════════════════
 
   get primaryChart(): ChartDatum[] {
     return this.createChartData([
