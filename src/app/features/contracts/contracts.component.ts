@@ -13,6 +13,7 @@ import {
 import { AuthService } from '../../core/services/auth.service';
 import { CONTRACT_TYPE_OPTIONS, CONTRACT_STATUS_OPTIONS, Company } from '../../core/models';
 import { SearchableSelectComponent } from '../../shared/searchable-select.component';
+import { ToastService } from '../../core/services/toast.service';
 
 @Component({
   selector: 'app-contracts',
@@ -63,7 +64,7 @@ export class ContractsComponent implements OnInit {
   cascadePositionsList: any[] = [];
   cascadeEmployeesList: any[] = [];
 
-  // ✅ NEW: Store all departments & positions for name resolution
+  // Store all departments & positions for name resolution
   allDepartments: any[] = [];
   allPositions: any[] = [];
 
@@ -94,18 +95,43 @@ export class ContractsComponent implements OnInit {
     private licenseService: LicenseService,
     private userService: UserService,
     private auth: AuthService,
+    private toastService: ToastService,
     private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit() {
     this.load();
     this.loadEmployees();
-    if (this.auth.isSuperAdmin()) {
-      this.loadCompanies();
-    }
-    // ✅ Load all departments & positions for name display
     this.loadAllDepartments();
     this.loadAllPositions();
+    
+    if (this.auth.isSuperAdmin()) {
+      this.loadCompanies();
+    } else {
+      // Pour les utilisateurs non super admin, charger les départements de leur entreprise
+      this.loadDepartmentsForCurrentCompany();
+    }
+  }
+
+  // Charger les départements pour l'entreprise courante (non super admin)
+  loadDepartmentsForCurrentCompany() {
+    const companyId = this.auth.currentUser()?.companyId;
+    if (companyId) {
+      console.log('🏢 Loading departments for current company:', companyId);
+      this.departmentService.getByCompany(companyId).subscribe({
+        next: (departments) => {
+          console.log('✅ Departments loaded:', departments);
+          this.cascadeDepartmentsList = departments || [];
+          this.filteredDepartments = [...this.cascadeDepartmentsList];
+          this.cdr.detectChanges();
+        },
+        error: (err) => {
+          console.error('❌ Error loading departments:', err);
+          this.cascadeDepartmentsList = [];
+          this.cdr.detectChanges();
+        }
+      });
+    }
   }
 
   // ═══════════════════════════════════════════════════════
@@ -149,7 +175,6 @@ export class ContractsComponent implements OnInit {
     });
   }
 
-  // ✅ Load all departments
   loadAllDepartments() {
     this.departmentService.getAll().subscribe({
       next: (departments) => {
@@ -160,7 +185,6 @@ export class ContractsComponent implements OnInit {
     });
   }
 
-  // ✅ Load all positions
   loadAllPositions() {
     this.positionService.getAll().subscribe({
       next: (positions) => {
@@ -172,7 +196,7 @@ export class ContractsComponent implements OnInit {
   }
 
   // ═══════════════════════════════════════════════════════
-  // CASCADE STRICTE
+  // CASCADE
   // ═══════════════════════════════════════════════════════
 
   onCascadeCompanyChange() {
@@ -211,6 +235,7 @@ export class ContractsComponent implements OnInit {
     
     if (this.cascade.departmentId) {
       this.loadPositionsForDepartment(this.cascade.departmentId);
+      this.updateCascadeEmployees();
     } else {
       this.cascadePositionsList = [];
       this.filteredPositions = [];
@@ -353,10 +378,18 @@ export class ContractsComponent implements OnInit {
     let list = [...this.employees];
     console.log(`  Tous les employés: ${list.length}`);
     
-    if (this.cascade.companyId) {
+    // Pour les utilisateurs non super admin, filtrer par leur entreprise
+    if (!this.auth.isSuperAdmin()) {
+      const companyId = this.auth.currentUser()?.companyId;
+      if (companyId) {
+        list = list.filter(e => (e.companyId || e.company?.id) === companyId);
+        console.log(`  Après filtre entreprise (non admin): ${list.length}`);
+      }
+    } else if (this.cascade.companyId) {
       list = list.filter(e => (e.companyId || e.company?.id) === this.cascade.companyId);
       console.log(`  Après filtre entreprise: ${list.length}`);
     }
+    
     if (this.cascade.departmentId) {
       list = list.filter(e => (e.departmentId || e.department?.id) === this.cascade.departmentId);
       console.log(`  Après filtre département: ${list.length}`);
@@ -505,47 +538,37 @@ export class ContractsComponent implements OnInit {
     return e?.positionId || e?.position?.id || undefined;
   }
 
-  // ✅ FIXED: Now checks allDepartments, cascadeList, and employee data
   departmentName(id?: string): string {
     if (!id) return '—';
     
-    // 1. Check allDepartments (always loaded)
     const dept = this.allDepartments.find(d => d.id === id);
     if (dept) return dept.name;
     
-    // 2. Check cascade list (populated during create/edit)
     const fromCascade = this.cascadeDepartmentsList.find(d => d.id === id);
     if (fromCascade) return fromCascade.name;
     
-    // 3. Check employee's department property
     for (const emp of this.employees) {
       if (emp.department?.id === id) return emp.department.name;
       if (emp.departmentId === id && typeof emp.department === 'string') return emp.department;
     }
     
-    // 4. Fallback - show ID
     return id;
   }
 
-  // ✅ FIXED: Now checks allPositions, cascadeList, and employee data
   positionName(id?: string): string {
     if (!id) return '—';
     
-    // 1. Check allPositions (always loaded)
     const pos = this.allPositions.find(p => p.id === id);
     if (pos) return pos.name || pos.title;
     
-    // 2. Check cascade list (populated during create/edit)
     const fromCascade = this.cascadePositionsList.find(p => p.id === id);
     if (fromCascade) return fromCascade.name;
     
-    // 3. Check employee's position property
     for (const emp of this.employees) {
       if (emp.position?.id === id) return emp.position.name || emp.position.title;
       if (emp.positionId === id && typeof emp.position === 'string') return emp.position;
     }
     
-    // 4. Fallback - show ID
     return id;
   }
 
@@ -602,8 +625,32 @@ export class ContractsComponent implements OnInit {
     this.activeContractWarning = '';
     this.companySearchTerm = ''; this.deptSearchTerm = ''; this.positionSearchTerm = ''; this.employeeSearchTerm = '';
     this.showCompanyDropdown = false; this.showDeptDropdown = false; this.showPositionDropdown = false; this.showEmployeeDropdown = false;
-    this.cascadeDepartmentsList = []; this.cascadePositionsList = [];
-    this.filteredDepartments = []; this.filteredPositions = [];
+    
+    // Pour les utilisateurs non super admin, charger les départements de leur entreprise
+    if (!this.auth.isSuperAdmin()) {
+      const companyId = this.auth.currentUser()?.companyId;
+      if (companyId) {
+        this.departmentService.getByCompany(companyId).subscribe({
+          next: (departments) => {
+            console.log('✅ Départements chargés pour création:', departments);
+            this.cascadeDepartmentsList = departments || [];
+            this.filteredDepartments = [...this.cascadeDepartmentsList];
+            this.cdr.detectChanges();
+          },
+          error: (err) => {
+            console.error('❌ Erreur chargement départements:', err);
+            this.cascadeDepartmentsList = [];
+            this.cdr.detectChanges();
+          }
+        });
+      }
+    } else {
+      this.cascadeDepartmentsList = [];
+      this.cascadePositionsList = [];
+    }
+    
+    this.filteredDepartments = [];
+    this.filteredPositions = [];
     this.cascadeEmployeesList = [...this.employees];
     this.filteredCascadeEmployees = [...this.employees];
     this.showModal = true;
@@ -644,7 +691,6 @@ export class ContractsComponent implements OnInit {
     this.showContractDetailsModal = true; 
     this.pdfError = '';
     
-    // ✅ Refresh departments & positions if needed
     if (this.allDepartments.length === 0) {
       this.loadAllDepartments();
     }
@@ -678,11 +724,24 @@ export class ContractsComponent implements OnInit {
     this.service.generatePdf(contract.id).subscribe({
       next: (res) => {
         this.service.downloadPdf(res.filename).subscribe({
-          next: (blob: Blob) => { this.triggerDownload(blob, res.filename); this.generatingPdfId = ''; this.cdr.detectChanges(); },
-          error: () => { this.pdfError = 'Impossible de télécharger le PDF.'; this.generatingPdfId = ''; this.cdr.detectChanges(); }
+          next: (blob: Blob) => { 
+            this.triggerDownload(blob, res.filename); 
+            this.generatingPdfId = ''; 
+            this.cdr.detectChanges();
+            this.toastService.success('PDF généré avec succès');
+          },
+          error: () => { 
+            this.pdfError = 'Impossible de télécharger le PDF.'; 
+            this.generatingPdfId = ''; 
+            this.cdr.detectChanges();
+          }
         });
       },
-      error: (err) => { this.pdfError = err?.error?.error || 'Erreur lors de la génération du contrat PDF.'; this.generatingPdfId = ''; this.cdr.detectChanges(); }
+      error: (err) => { 
+        this.pdfError = err?.error?.error || 'Erreur lors de la génération du contrat PDF.'; 
+        this.generatingPdfId = ''; 
+        this.cdr.detectChanges();
+      }
     });
   }
 
@@ -738,10 +797,28 @@ export class ContractsComponent implements OnInit {
     if (this.form.transportAllowance) payload.transportAllowance = +this.form.transportAllowance;
     if (this.form.notes) payload.notes = this.form.notes;
     const obs = this.editing ? this.service.update(this.editingId, payload) : this.service.create(payload);
-    obs.subscribe({ next: () => { this.showModal = false; this.load(); this.cdr.detectChanges(); }, error: (e) => { this.error = e?.error?.error || 'Erreur serveur'; this.cdr.detectChanges(); } });
+    obs.subscribe({ 
+      next: () => { 
+        this.showModal = false; 
+        this.load(); 
+        this.cdr.detectChanges();
+        this.toastService.success(this.editing ? 'Contrat modifié avec succès' : 'Contrat créé avec succès');
+      }, 
+      error: (e) => { 
+        this.error = e?.error?.error || 'Erreur serveur'; 
+        this.cdr.detectChanges();
+        this.toastService.error(this.error);
+      } 
+    });
   }
 
-  delete(id: string) { if (!confirm('Supprimer ce contrat ?')) return; this.service.delete(id).subscribe(() => this.load()); }
+  delete(id: string) { 
+    if (!confirm('Supprimer ce contrat ?')) return; 
+    this.service.delete(id).subscribe(() => {
+      this.load();
+      this.toastService.success('Contrat supprimé avec succès');
+    }); 
+  }
 
   // ═══════════════════════════════════════════════════════
   // MODAL CONTRAT DE SERVICE

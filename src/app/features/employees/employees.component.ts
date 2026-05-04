@@ -28,10 +28,10 @@ export class EmployeesComponent implements OnInit {
   items: Employee[] = [];
   filtered: Employee[] = [];
   companies: Company[] = [];
-  departments: Department[] = [];
-  positions: Position[] = [];
+  departments: Department[] = [];      // Tous les départements
+  positions: Position[] = [];          // Tous les postes
 
-  // Listes filtrées pour la cascade
+  // ✅ Listes filtrées pour la cascade
   filteredDepartmentsList: Department[] = [];
   filteredPositionsList: Position[] = [];
 
@@ -53,7 +53,7 @@ export class EmployeesComponent implements OnInit {
   infoEmployee: Employee | null = null;
   infoTab: 'personnel' | 'contact' | 'pro' | 'salaire' | 'contrat' = 'personnel';
 
-  // Contrats de l'employé affiché
+  // ── Contrats de l'employé affiché ──────────────────────────────────────────
   employeeContracts: any[] = [];
   loadingContracts = false;
 
@@ -87,20 +87,18 @@ export class EmployeesComponent implements OnInit {
         this.departments = d.departments;
         this.positions = d.positions;
         
+        // ✅ Initialisation des listes filtrées
         this.updateFilteredDepartments();
         this.updateFilteredPositions();
         
         this.loading = false;
         this.cdr.detectChanges();
       },
-      error: () => { 
-        this.loading = false; 
-        this.cdr.detectChanges(); 
-      }
+      error: () => { this.loading = false; this.cdr.detectChanges(); }
     });
   }
 
-  // ✅ Mettre à jour les départements filtrés selon entreprise sélectionnée
+  // ✅ METTRE À JOUR les départements filtrés selon entreprise sélectionnée
   updateFilteredDepartments() {
     if (!this.form.companyId) {
       this.filteredDepartmentsList = [];
@@ -112,16 +110,24 @@ export class EmployeesComponent implements OnInit {
     // Reset department & position when company changes
     this.form.departmentId = '';
     this.form.positionId = '';
-    this.filteredPositionsList = []; // Vider les postes
+    this.updateFilteredPositions();
     this.cdr.detectChanges();
   }
 
-  // ✅ Mettre à jour les postes filtrés selon département sélectionné UNIQUEMENT
+  // ✅ METTRE À JOUR les postes filtrés selon département sélectionné
   updateFilteredPositions() {
-    // ⚠️ CRITIQUE: Les postes n'apparaissent QUE si un département est sélectionné
     if (!this.form.departmentId) {
-      this.filteredPositionsList = [];
+      // Si aucun département, montrer les postes de l'entreprise
+      if (this.form.companyId) {
+        const deptIds = this.departments.filter(d => d.companyId === this.form.companyId).map(d => d.id);
+        this.filteredPositionsList = this.positions.filter(p => 
+          !p.departmentId || deptIds.includes(p.departmentId)
+        );
+      } else {
+        this.filteredPositionsList = [];
+      }
     } else {
+      // Filtrer les postes par département
       this.filteredPositionsList = this.positions.filter(
         p => p.departmentId === this.form.departmentId
       );
@@ -149,16 +155,11 @@ export class EmployeesComponent implements OnInit {
         this.loading = false;
         this.cdr.detectChanges();
       },
-      error: () => { 
-        this.loading = false; 
-        this.cdr.detectChanges(); 
-      }
+      error: () => { this.loading = false; this.cdr.detectChanges(); }
     });
   }
 
-  onSearch() { 
-    this.applyFilters(); 
-  }
+  onSearch() { this.applyFilters(); }
 
   applyFilters() {
     const q = this.search.toLowerCase();
@@ -172,20 +173,9 @@ export class EmployeesComponent implements OnInit {
     });
   }
 
-  clearCompanyFilter() { 
-    this.companyFilterId = ''; 
-    this.applyFilters(); 
-  }
-  
-  clearDepartmentFilter() { 
-    this.departmentFilterId = ''; 
-    this.applyFilters(); 
-  }
-  
-  clearStatusFilter() { 
-    this.statusFilter = ''; 
-    this.applyFilters(); 
-  }
+  clearCompanyFilter() { this.companyFilterId = ''; this.applyFilters(); }
+  clearDepartmentFilter() { this.departmentFilterId = ''; this.applyFilters(); }
+  clearStatusFilter() { this.statusFilter = ''; this.applyFilters(); }
 
   openFilterPanel() {
     this.pendingCompanyId = this.companyFilterId;
@@ -193,10 +183,7 @@ export class EmployeesComponent implements OnInit {
     this.pendingStatus = this.statusFilter;
     this.showFilterPanel = true;
   }
-  
-  closeFilterPanel() { 
-    this.showFilterPanel = false; 
-  }
+  closeFilterPanel() { this.showFilterPanel = false; }
 
   togglePendingCompanySelection(companyId: string) {
     this.pendingCompanyId = this.pendingCompanyId === companyId ? '' : companyId;
@@ -207,18 +194,12 @@ export class EmployeesComponent implements OnInit {
       }
     }
   }
-  
-  isPendingCompanySelected(companyId: string) { 
-    return this.pendingCompanyId === companyId; 
-  }
+  isPendingCompanySelected(companyId: string) { return this.pendingCompanyId === companyId; }
 
   togglePendingDepartmentSelection(deptId: string) {
     this.pendingDepartmentId = this.pendingDepartmentId === deptId ? '' : deptId;
   }
-  
-  isPendingDepartmentSelected(deptId: string) { 
-    return this.pendingDepartmentId === deptId; 
-  }
+  isPendingDepartmentSelected(deptId: string) { return this.pendingDepartmentId === deptId; }
 
   togglePendingStatusSelection(status: string) {
     this.pendingStatus = this.pendingStatus === status ? '' : status;
@@ -238,7 +219,7 @@ export class EmployeesComponent implements OnInit {
     this.pendingStatus = '';
   }
 
-  // Ouvrir modal info + charger contrats
+  // ── Ouvrir modal info + charger contrats ────────────────────────────────────
   openInfo(item: Employee) {
     this.infoEmployee = item;
     this.infoTab = 'personnel';
@@ -270,11 +251,7 @@ export class EmployeesComponent implements OnInit {
     return this.employeeContracts.find(c => c.status === 'ACTIVE') ?? null;
   }
 
-  closeInfo() { 
-    this.showInfoModal = false; 
-    this.cdr.detectChanges(); 
-  }
-  
+  closeInfo() { this.showInfoModal = false; this.cdr.detectChanges(); }
   openEditFromInfo() {
     if (this.infoEmployee) {
       const emp = this.infoEmployee;
@@ -287,10 +264,9 @@ export class EmployeesComponent implements OnInit {
     this.form = this.emptyForm();
     this.form.companyId = this.auth.currentUser()?.companyId ?? '';
     
-    this.filteredDepartmentsList = [];
-    this.filteredPositionsList = [];
-    this.form.departmentId = '';
-    this.form.positionId = '';
+    // ✅ Réinitialiser les listes filtrées
+    this.updateFilteredDepartments();
+    this.updateFilteredPositions();
     
     this.editing = false;
     this.editingId = '';
@@ -324,21 +300,8 @@ export class EmployeesComponent implements OnInit {
       bankAccountNumber: item.bankAccountNumber ?? '',
     };
     
-    // Charger les départements de l'entreprise
-    if (this.form.companyId) {
-      this.filteredDepartmentsList = this.departments.filter(
-        d => d.companyId === this.form.companyId
-      );
-    }
-    
-    // Charger les postes du département
-    if (this.form.departmentId) {
-      this.filteredPositionsList = this.positions.filter(
-        p => p.departmentId === this.form.departmentId
-      );
-    } else {
-      this.filteredPositionsList = [];
-    }
+    // ✅ Mettre à jour les listes filtrées selon l'entreprise selectionnée
+    this.updateFilteredDepartments();
     
     this.editing = true;
     this.editingId = item.id;
@@ -383,7 +346,7 @@ export class EmployeesComponent implements OnInit {
     this.service.delete(id).subscribe(() => this.load());
   }
 
-  // Helpers contrat
+  // ── Helpers contrat ─────────────────────────────────────────────────────────
   contractTypeClass(type: string): string {
     const m: any = {
       CDI: 'badge-success', CDD: 'badge-info',
@@ -409,12 +372,10 @@ export class EmployeesComponent implements OnInit {
     if (!dateStr) return '—';
     try {
       return new Date(dateStr).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
-    } catch { 
-      return dateStr; 
-    }
+    } catch { return dateStr; }
   }
 
-  // Getters pour les listes filtrées
+  // ── Filtres dép / postes (READONLY pour les selecteurs dans le formulaire) ──
   get filteredDepartments(): Department[] {
     return this.filteredDepartmentsList;
   }
@@ -434,30 +395,14 @@ export class EmployeesComponent implements OnInit {
     return this.companies.find(c => c.id === companyId)?.name ?? 'Entreprise assignée automatiquement';
   }
 
-  companyName(id?: string | null) { 
-    return id ? (this.companies.find(c => c.id === id)?.name ?? '—') : '—'; 
-  }
-  
-  departmentName(id?: string | null) { 
-    return id ? (this.departments.find(d => d.id === id)?.name ?? '—') : '—'; 
-  }
-  
-  positionName(id?: string | null) { 
-    return id ? (this.positions.find(p => p.id === id)?.name ?? '—') : '—'; 
-  }
+  companyName(id?: string | null) { return id ? (this.companies.find(c => c.id === id)?.name ?? '—') : '—'; }
+  departmentName(id?: string | null) { return id ? (this.departments.find(d => d.id === id)?.name ?? '—') : '—'; }
+  positionName(id?: string | null) { return id ? (this.positions.find(p => p.id === id)?.name ?? '—') : '—'; }
 
-  get isSuperAdmin(): boolean { 
-    return this.auth.isSuperAdmin(); 
-  }
+  get isSuperAdmin(): boolean { return this.auth.isSuperAdmin(); }
 
-  close() { 
-    this.showModal = false; 
-    this.cdr.detectChanges(); 
-  }
-  
-  hasError(f: string) { 
-    return !!this.errors[f]; 
-  }
+  close() { this.showModal = false; this.cdr.detectChanges(); }
+  hasError(f: string) { return !!this.errors[f]; }
 
   private emptyForm(): any {
     return {

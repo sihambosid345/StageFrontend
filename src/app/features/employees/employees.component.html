@@ -390,7 +390,7 @@
               valueField="id"
               [(ngModel)]="form.departmentId"
               (valueChange)="onDepartmentChange()"
-              [disabled]="!form.companyId"
+              
               placeholder="— Sélectionner un département —">
             </app-searchable-select>
             <small *ngIf="!form.companyId" class="form-hint">
