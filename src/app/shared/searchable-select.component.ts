@@ -62,7 +62,7 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
       color: #1f2937;
     }
     .selected-value.placeholder {
-      color: #9ca3af;
+      color: #fff;
     }
     .dropdown {
       position: absolute;

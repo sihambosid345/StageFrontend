@@ -936,24 +936,5 @@
   margin-top: 0.25rem;
   font-weight: 400;
 }
-// Dans votre fichier .scss, ajoutez:
-app-searchable-select {
-  &.disabled,
-  &[disabled] {
-    opacity: 0.6;
-    pointer-events: none;
-    
-    ::ng-deep .searchable-select-input {
-      background-color: #f3f4f6 !important;
-      border-color: #e5e7eb !important;
-      color: #9ca3af !important;
-    }
-  }
-}
-select:disabled,
-input:disabled {
-  background-color: #f3f4f6;
-  border-color: #e5e7eb;
-  color: #9ca3af;
-  cursor: not-allowed;
-}
+
+

@@ -785,6 +785,15 @@ export class ContractsComponent implements OnInit {
     if (!this.form.contractType) { this.error = 'Veuillez sélectionner un type de contrat.'; this.cdr.detectChanges(); return; }
     if (!this.form.startDate) { this.error = 'Veuillez renseigner la date de début.'; this.cdr.detectChanges(); return; }
     if (!this.form.baseSalary || this.form.baseSalary <= 0) { this.error = 'Veuillez renseigner un salaire de base valide.'; this.cdr.detectChanges(); return; }
+    if (!this.form.contractType) { this.error = 'Veuillez sélectionner un type de contrat.'; this.cdr.detectChanges(); return; }
+    if (!this.form.startDate) { this.error = 'Veuillez renseigner la date de début.'; this.cdr.detectChanges(); return; }
+    if (!this.form.baseSalary || this.form.baseSalary <= 0) { this.error = 'Veuillez renseigner un salaire de base valide.'; this.cdr.detectChanges(); return; }
+
+    if (this.form.contractType !== 'CDI' && !this.form.endDate) {
+  this.error = 'La date de fin est obligatoire pour un contrat ' + this.form.contractType + '.';
+  this.cdr.detectChanges();
+  return;
+}
     if (this.form.status === 'ACTIVE') {
       const exist = this.items.find(c => c.employeeId === this.form.employeeId && c.status === 'ACTIVE' && c.id !== this.editingId);
       if (exist) { this.error = "Cet employé a déjà un contrat actif."; this.cdr.detectChanges(); return; }

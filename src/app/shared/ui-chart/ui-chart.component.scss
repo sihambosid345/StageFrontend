@@ -1,130 +1,391 @@
 // ═══════════════════════════════════════════════════════
-// UI CHART - NGX-CHARTS PROFESSIONAL STYLING
+// UI CHART — DESIGN PROFESSIONNEL HRMATRIX
+// FIX : sizing ngx-charts + yAxis entiers + hauteur stable
 // ═══════════════════════════════════════════════════════
 
+$ease        : cubic-bezier(0.4, 0, 0.2, 1);
+
+$c-blue    : #3b82f6;
+$c-violet  : #8b5cf6;
+$c-green   : #10b981;
+$c-amber   : #f59e0b;
+$c-red     : #ef4444;
+
+$c-blue-bg     : #eff6ff;
+$c-blue-text   : #1d4ed8;
+
+// ── Card ────────────────────────────────────────────────
 .ui-chart-card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 20px;
-  padding: 1.5rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
-  transition: all 0.25s ease;
-  height: 100%;
-  display: flex;
+  background    : #ffffff;
+  border        : 1px solid #e2e8f0;
+  border-radius : 16px;
+  padding       : 1.35rem 1.5rem 1.25rem;
+  height        : 100%;
+  display       : flex;
   flex-direction: column;
+  position      : relative;
+  overflow      : hidden;
+  transition    : border-color 200ms $ease, box-shadow 200ms $ease, transform 220ms $ease;
+
+  &::before {
+    content      : '';
+    position     : absolute;
+    top: 0; left: 0; right: 0;
+    height       : 2px;
+    border-radius: 16px 16px 0 0;
+    background   : linear-gradient(90deg, $c-blue 0%, $c-violet 50%, $c-green 100%);
+  }
 
   &:hover {
-    border-color: #c7d2fe;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+    border-color: #cbd5e1;
+    box-shadow  : 0 8px 24px rgba(15, 23, 42, 0.09);
+    transform   : translateY(-2px);
+
+    .ui-chart-icon {
+      background: #0f172a;
+      i { color: #ffffff; }
+    }
+  }
+
+  &.type-donut::before { background: linear-gradient(90deg, $c-violet 0%, $c-blue 60%, $c-green 100%); }
+  &.type-bar::before   { background: linear-gradient(90deg, $c-green 0%, $c-blue 100%); }
+}
+
+// ── HEAD ────────────────────────────────────────────────
+.ui-chart-head {
+  display        : flex;
+  align-items    : center;
+  justify-content: space-between;
+  gap            : 1rem;
+  margin-bottom  : 1rem;
+  padding-bottom : 0.85rem;
+  border-bottom  : 1px solid #f1f5f9;
+  flex-shrink    : 0;
+}
+
+.ui-chart-title-section {
+  display    : flex;
+  align-items: center;
+  gap        : 0.7rem;
+  flex       : 1;
+  min-width  : 0;
+}
+
+.ui-chart-icon {
+  width        : 38px;
+  height       : 38px;
+  min-width    : 38px;
+  display      : grid;
+  place-items  : center;
+  border-radius: 10px;
+  background   : #f1f5f9;
+  transition   : background 180ms $ease;
+
+  i {
+    font-size : 0.95rem;
+    color     : $c-blue;
+    transition: color 180ms $ease;
   }
 }
 
-.ui-chart-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 1rem;
-  padding-bottom: 0.8rem;
-  border-bottom: 2px solid #f1f5f9;
+.ui-chart-text {
+  flex     : 1;
+  min-width: 0;
 
   h3 {
-    margin: 0;
-    font-size: 1.05rem;
-    font-weight: 700;
-    color: #1e293b;
+    margin        : 0;
+    font-size     : 0.9rem;
+    font-weight   : 700;
+    color         : #0f172a;
+    letter-spacing: -0.01em;
+    line-height   : 1.2;
   }
 
   p {
-    margin: 0.25rem 0 0;
-    font-size: 0.78rem;
-    color: #94a3b8;
+    margin       : 0.12rem 0 0;
+    font-size    : 0.7rem;
+    color        : #94a3b8;
+    font-weight  : 500;
+    white-space  : nowrap;
+    overflow     : hidden;
+    text-overflow: ellipsis;
   }
 }
 
 .ui-chart-total {
-  min-width: 52px;
-  height: 52px;
-  display: grid;
-  place-items: center;
-  border-radius: 14px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  color: #0f172a;
-  font-size: 1.2rem;
-  font-weight: 800;
-}
-
-.chart-body {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 320px;
-}
-
-// Empty state
-.ui-chart-empty {
-  flex: 1;
-  min-height: 300px;
-  display: flex;
+  display       : flex;
   flex-direction: column;
+  align-items   : center;
+  padding       : 0.4rem 0.8rem;
+  border-radius : 10px;
+  background    : #f8fafc;
+  border        : 1px solid #e8edf4;
+  min-width     : 58px;
+  flex-shrink   : 0;
+
+  .total-number {
+    font-size           : 1.45rem;
+    font-weight         : 800;
+    color               : #0f172a;
+    line-height         : 1;
+    letter-spacing      : -0.03em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .total-label {
+    font-size     : 0.56rem;
+    font-weight   : 700;
+    color         : #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-top    : 0.08rem;
+  }
+}
+
+// ── CHART BODY ──────────────────────────────────────────
+.chart-body {
+  flex          : 1;
+  display       : flex;
+  flex-direction: column;
+  min-height    : 0; // FIX flex overflow
+}
+
+// ── FIX PRINCIPAL : hauteur fixe sur le wrapper ─────────
+// ngx-charts a besoin d'un conteneur avec une hauteur DÉFINIE
+// (pas min-height) pour calculer correctement ses dimensions SVG.
+.chart-wrapper {
+  height    : 220px; // hauteur fixe — le chart s'adapte dedans
+  width     : 100%;
+  position  : relative;
+  flex-shrink: 0;
+
+  // ngx-charts doit occuper tout le wrapper
+  ngx-charts-advanced-pie-chart,
+  ngx-charts-bar-vertical {
+    display: block;
+    width  : 100% !important;
+    height : 100% !important;
+  }
+
+  // FIX ngx-charts : supprime le float interne qui casse le sizing
+  ::ng-deep .ngx-charts-outer {
+    float : none !important;
+    height: 100% !important;
+  }
+
+  ::ng-deep svg.ngx-charts {
+    overflow: visible;
+  }
+}
+
+// ── LÉGENDE ─────────────────────────────────────────────
+.chart-legend-custom {
+  display    : flex;
+  flex-wrap  : wrap;
+  gap        : 0.4rem;
+  padding-top: 0.8rem;
+  border-top : 1px solid #f1f5f9;
+  margin-top : 0.6rem;
+  flex-shrink: 0;
+}
+
+.legend-item {
+  display    : flex;
   align-items: center;
+  gap        : 0.38rem;
+  padding    : 0.28rem 0.6rem;
+  border-radius: 7px;
+  background : #f8fafc;
+  border     : 1px solid #f1f5f9;
+  cursor     : default;
+  transition : all 130ms $ease;
+
+  &:hover {
+    background  : #ffffff;
+    border-color: #e2e8f0;
+    box-shadow  : 0 2px 8px rgba(15, 23, 42, 0.07);
+    transform   : translateY(-1px);
+  }
+}
+
+.legend-color {
+  width        : 8px;
+  height       : 8px;
+  border-radius: 2px;
+  flex-shrink  : 0;
+}
+
+.legend-label {
+  font-size  : 0.71rem;
+  color      : #64748b;
+  font-weight: 500;
+}
+
+.legend-value {
+  font-size           : 0.71rem;
+  font-weight         : 800;
+  color               : #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+
+.legend-pct {
+  font-size    : 0.62rem;
+  font-weight  : 700;
+  padding      : 0.1rem 0.3rem;
+  border-radius: 4px;
+  color        : $c-blue-text;
+  background   : $c-blue-bg;
+}
+
+// ── ÉTAT VIDE ───────────────────────────────────────────
+.ui-chart-empty {
+  flex           : 1;
+  min-height     : 240px;
+  display        : flex;
+  flex-direction : column;
+  align-items    : center;
   justify-content: center;
-  color: #cbd5e1;
-  border: 2px dashed #e2e8f0;
+  text-align     : center;
+  padding        : 2rem;
+}
+
+.empty-icon-wrapper {
+  width        : 60px;
+  height       : 60px;
+  display      : grid;
+  place-items  : center;
   border-radius: 14px;
-  gap: 0.5rem;
+  background   : #f8fafc;
+  border       : 1px solid #e2e8f0;
+  margin-bottom: 0.9rem;
 
   i {
-    font-size: 2.5rem;
-    opacity: 0.5;
-  }
-
-  span {
-    font-size: 0.88rem;
-    font-weight: 500;
+    font-size: 1.5rem;
+    color    : #cbd5e1;
   }
 }
 
-// ═══════════════════════════════════════════════════════
-// NGX-CHARTS OVERRIDES
-// ═══════════════════════════════════════════════════════
+.empty-text {
+  font-size    : 0.88rem;
+  font-weight  : 700;
+  color        : #64748b;
+  display      : block;
+  margin-bottom: 0.3rem;
+}
 
+.empty-hint {
+  font-size  : 0.74rem;
+  color      : #94a3b8;
+  max-width  : 200px;
+  line-height: 1.55;
+}
+
+// ── NGX-CHARTS OVERRIDES ────────────────────────────────
 ::ng-deep {
-  // Advanced pie chart - center label
+
+  // FIX global : ngx-charts utilise float:left sur .ngx-charts-outer
+  // ce float empêche le parent de calculer la bonne hauteur
+  .ngx-charts-outer {
+    float : none !important;
+    height: 100% !important;
+  }
+
+  // Advanced Pie
   .advanced-pie-legend {
     .total-value {
-      font-size: 2rem !important;
-      font-weight: 800 !important;
-      color: #0f172a !important;
+      font-size     : 1.9rem !important;
+      font-weight   : 800 !important;
+      fill          : #0f172a !important;
+      letter-spacing: -0.03em !important;
     }
+
     .total-label {
-      font-size: 0.75rem !important;
-      font-weight: 600 !important;
-      color: #94a3b8 !important;
+      font-size     : 0.6rem !important;
+      font-weight   : 700 !important;
+      fill          : #94a3b8 !important;
       text-transform: uppercase !important;
+      letter-spacing: 0.08em !important;
+    }
+
+    .legend-items-container .legend-items .legend-item {
+      .item-value {
+        font-size  : 0.8rem !important;
+        font-weight: 800 !important;
+        fill       : #0f172a !important;
+      }
+      .item-label {
+        font-size: 0.72rem !important;
+        fill     : #64748b !important;
+      }
+      .item-percent {
+        font-size  : 0.66rem !important;
+        font-weight: 700 !important;
+        fill       : $c-blue !important;
+      }
     }
   }
 
-  // Legend items
-  .legend-label {
-    color: #475569 !important;
-    font-weight: 600 !important;
+  .arc path {
+    stroke      : #ffffff !important;
+    stroke-width: 2px !important;
   }
 
   // Bar chart
-  .bar {
-    cursor: pointer;
-    transition: opacity 0.2s ease;
-    
-    &:hover {
-      opacity: 0.85;
+  .bar-chart {
+    .bar { cursor: pointer; }
+
+    .tick text {
+      font-size  : 0.68rem !important;
+      font-weight: 600 !important;
+      fill       : #64748b !important;
+    }
+
+    .y.axis .tick text {
+      font-size: 0.66rem !important;
+      fill     : #94a3b8 !important;
+    }
+
+    .data-label {
+      font-size  : 0.7rem !important;
+      font-weight: 800 !important;
+      fill       : #0f172a !important;
     }
   }
 
-  // Chart text
-  .ngx-charts text {
-    font-family: 'Inter', -apple-system, sans-serif !important;
+  .gridline-path {
+    stroke         : #f1f5f9 !important;
+    stroke-width   : 1 !important;
+    stroke-dasharray: 4 4 !important;
   }
+
+  .axis-label text { fill: #94a3b8 !important; }
+
+  .ngx-charts-tooltip-content {
+    background   : #ffffff !important;
+    border       : 1px solid #e2e8f0 !important;
+    border-radius: 10px !important;
+    box-shadow   : 0 8px 24px rgba(15, 23, 42, 0.1) !important;
+    padding      : 0.55rem 0.85rem !important;
+
+    .tooltip-label {
+      font-size  : 0.72rem !important;
+      font-weight: 600 !important;
+      color      : #64748b !important;
+    }
+    .tooltip-val {
+      font-size  : 0.82rem !important;
+      font-weight: 800 !important;
+      color      : #0f172a !important;
+    }
+  }
+
+  .ngx-charts text {
+    font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif !important;
+  }
+}
+
+// ── RESPONSIVE ─────────────────────────────────────────
+@media (max-width: 768px) {
+  .ui-chart-card { padding: 1rem 1.1rem; }
+  .chart-wrapper  { height: 180px; }
 }

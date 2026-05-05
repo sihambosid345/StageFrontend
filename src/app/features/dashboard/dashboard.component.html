@@ -1,7 +1,9 @@
 <section class="dashboard-page">
   <header class="dashboard-topbar">
     <div class="topbar-copy">
-      <span class="hero-kicker">{{ auth.isSuperAdmin() ? 'Vue super admin' : 'Espace entreprise' }}</span>
+      <span class="hero-kicker">
+        {{ auth.isSuperAdmin() ? 'Vue super admin' : 'Espace entreprise' }}
+      </span>
       <h1>{{ heroTitle }}</h1>
       <p>{{ heroDescription }}</p>
     </div>
@@ -19,79 +21,91 @@
   </header>
 
   <div *ngIf="loading" class="loading-panel">
-    <div class="loading-spinner"></div>
+    <div class="loading-ring">
+      <div></div><div></div><div></div><div></div>
+    </div>
     <p>Chargement du tableau de bord...</p>
   </div>
 
   <ng-container *ngIf="!loading">
+
+    <!-- KPI METRICS ROW -->
     <div class="metrics-grid">
       <article class="metric-card" *ngFor="let item of metrics" [attr.data-tone]="item.tone">
         <div class="metric-icon">
           <i class="bi" [ngClass]="item.icon"></i>
         </div>
         <div class="metric-content">
-          <span>{{ item.label }}</span>
-          <strong>{{ item.value }}</strong>
-          <small>{{ item.helper }}</small>
+          <span class="metric-label">{{ item.label }}</span>
+          <strong class="metric-value">{{ item.value }}</strong>
+          <small class="metric-helper">{{ item.helper }}</small>
+        </div>
+        <div class="metric-sparkline">
+          <svg viewBox="0 0 60 30" preserveAspectRatio="none">
+            <polyline points="0,25 10,18 20,22 30,10 40,15 50,8 60,5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
         </div>
       </article>
     </div>
 
+    <!-- MAIN CONTENT -->
     <div class="dashboard-shell">
+
+      <!-- LEFT: Summary + Charts -->
       <section class="panel-block summary-panel">
         <div class="section-heading">
           <div>
-            <h2>Resume executif</h2>
-            <p>Les informations les plus importantes pour piloter rapidement l activite.</p>
+            <h2>Résumé exécutif</h2>
+            <p>Les informations clés pour piloter rapidement l'activité.</p>
           </div>
         </div>
 
         <div class="summary-grid">
-          <article class="highlight-card major-highlight" *ngFor="let item of highlights">
-            <span>{{ item.eyebrow }}</span>
-            <strong>{{ item.value }}</strong>
-            <h3>{{ item.title }}</h3>
-            <p>{{ item.description }}</p>
+          <article class="highlight-card" *ngFor="let item of highlights; let i = index" [attr.data-index]="i">
+            <span class="highlight-eyebrow">{{ item.eyebrow }}</span>
+            <strong class="highlight-value">{{ item.value }}</strong>
+            <h3 class="highlight-title">{{ item.title }}</h3>
+            <p class="highlight-desc">{{ item.description }}</p>
           </article>
         </div>
 
         <div class="featured-chart-row">
           <app-ui-chart
             [title]="'Effectif par statut'"
-            [subtitle]="'Lecture immediate de la repartition de vos employes.'"
+            [subtitle]="'Répartition de vos employés'"
             [type]="'donut'"
-            [centerLabel]="'Employes'"
+            [centerLabel]="'Employés'"
             [data]="primaryChart"
           />
-
           <app-ui-chart
             [title]="'Statut des contrats'"
-            [subtitle]="'Etat actuel des contrats en cours dans la base.'"
+            [subtitle]="'Contrats en cours dans la base'"
             [type]="'bar'"
             [data]="contractChart"
           />
         </div>
       </section>
 
+      <!-- RIGHT: Quick access + Insights -->
       <aside class="side-column">
         <section class="panel-block quick-access">
           <div class="section-heading">
             <div>
-              <h2>Acces rapide</h2>
-              <p>Raccourcis vers les zones les plus utilisees.</p>
+              <h2>Accès rapide</h2>
+              <p>Raccourcis vers les zones les plus utilisées.</p>
             </div>
           </div>
 
           <div class="quick-stack">
-            <a *ngFor="let link of visibleQuickLinks" class="quick-card compact" [routerLink]="link.route">
+            <a *ngFor="let link of visibleQuickLinks" class="quick-card" [routerLink]="link.route">
               <div class="quick-icon">
                 <i class="bi" [ngClass]="link.icon"></i>
               </div>
-              <div>
+              <div class="quick-text">
                 <h3>{{ link.title }}</h3>
                 <p>{{ link.description }}</p>
               </div>
-              <i class="bi bi-arrow-up-right"></i>
+              <i class="bi bi-arrow-up-right quick-arrow"></i>
             </a>
           </div>
         </section>
@@ -100,44 +114,58 @@
           <div class="section-heading">
             <div>
               <h2>Lecture rapide</h2>
-              <p>Quelques points cles a verifier en priorite.</p>
+              <p>Points clés à vérifier en priorité.</p>
             </div>
           </div>
 
           <div class="insight-list">
             <div class="insight-row">
-              <span>Employes actifs</span>
+              <div class="insight-left">
+                <div class="insight-dot" style="background:#3b82f6"></div>
+                <span>Employés actifs</span>
+              </div>
               <strong>{{ metrics[0].helper }}</strong>
             </div>
             <div class="insight-row">
-              <span>Contrats actifs</span>
+              <div class="insight-left">
+                <div class="insight-dot" style="background:#10b981"></div>
+                <span>Contrats actifs</span>
+              </div>
               <strong>{{ metrics[4].helper }}</strong>
             </div>
             <div class="insight-row">
-              <span>Volume de presences</span>
+              <div class="insight-left">
+                <div class="insight-dot" style="background:#f59e0b"></div>
+                <span>Volume présences</span>
+              </div>
               <strong>{{ metrics[3].value }}</strong>
             </div>
             <div class="insight-row" *ngIf="auth.isSuperAdmin()">
-              <span>Etat des licences</span>
-              <strong>{{ metrics[5].helper }}</strong>
+              <div class="insight-left">
+                <div class="insight-dot" style="background:#8b5cf6"></div>
+                <span>État des licences</span>
+              </div>
+              <strong>{{ metrics[5]?.helper }}</strong>
             </div>
           </div>
         </section>
       </aside>
     </div>
 
+    <!-- ANALYTICS SECTION -->
     <section class="panel-block analytics-block">
       <div class="section-heading">
         <div>
-          <h2>Analyses detaillees</h2>
-          <p>Graphiques bases sur les donnees recuperees en temps reel.</p>
+          <h2>Analyses détaillées</h2>
+          <p>Graphiques basés sur les données récupérées en temps réel.</p>
         </div>
+        <div class="section-badge">Live</div>
       </div>
 
       <div class="analytics-grid">
         <app-ui-chart
-          [title]="'Presences enregistrees'"
-          [subtitle]="'Resume des statuts de presence deja saisis.'"
+          [title]="'Présences enregistrées'"
+          [subtitle]="'Résumé des statuts de présence saisis'"
           [type]="'bar'"
           [data]="attendanceChart"
         />
@@ -145,7 +173,7 @@
         <app-ui-chart
           *ngIf="auth.isSuperAdmin(); else departmentChart"
           [title]="'Portefeuille entreprises'"
-          [subtitle]="'Vision du parc d entreprises par statut global.'"
+          [subtitle]="'Entreprises par statut global'"
           [type]="'donut'"
           [centerLabel]="'Entreprises'"
           [data]="companyStatusChart"
@@ -153,8 +181,8 @@
 
         <ng-template #departmentChart>
           <app-ui-chart
-            [title]="'Departements les plus charges'"
-            [subtitle]="'Les equipes qui concentrent le plus d effectifs.'"
+            [title]="'Départements les plus chargés'"
+            [subtitle]="'Équipes qui concentrent le plus d\'effectifs'"
             [type]="'bar'"
             [data]="topDepartments"
           />
@@ -163,12 +191,13 @@
         <app-ui-chart
           *ngIf="auth.isSuperAdmin()"
           [title]="'Cycle des licences'"
-          [subtitle]="'Licences actives, en essai et expirees de la plateforme.'"
+          [subtitle]="'Licences actives, en essai et expirées'"
           [type]="'donut'"
           [centerLabel]="'Licences'"
           [data]="licenseChart"
         />
       </div>
     </section>
+
   </ng-container>
 </section>

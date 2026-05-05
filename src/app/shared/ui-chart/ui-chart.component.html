@@ -1,51 +1,135 @@
-<article class="ui-chart-card">
+<article
+  class="ui-chart-card"
+  [class.type-donut]="type === 'donut'"
+  [class.type-bar]="type === 'bar'"
+  [class.has-data]="hasData()">
+
+  <!-- ══ HEAD ══════════════════════════════════════════ -->
   <div class="ui-chart-head">
-    <div>
-      <h3>{{ title }}</h3>
-      <p *ngIf="subtitle">{{ subtitle }}</p>
+
+    <div class="ui-chart-title-section">
+      <div class="ui-chart-icon">
+        <i class="bi"
+           [ngClass]="type === 'donut' ? 'bi-pie-chart-fill' : 'bi-bar-chart-fill'">
+        </i>
+      </div>
+      <div class="ui-chart-text">
+        <h3>{{ title }}</h3>
+        <p *ngIf="subtitle">{{ subtitle }}</p>
+      </div>
     </div>
+
     <div class="ui-chart-total" *ngIf="hasData()">
-      {{ total() }}
+      <span class="total-number">{{ total() }}</span>
+      <span class="total-label">Total</span>
     </div>
+
   </div>
+  <!-- ══ END HEAD ═══════════════════════════════════════ -->
 
+
+  <!-- ══ CONTENT ═══════════════════════════════════════ -->
   <ng-container *ngIf="hasData(); else emptyState">
-    
-    <!-- Donut Chart -->
-    <div class="chart-body" *ngIf="type === 'donut'">
-      <ngx-charts-advanced-pie-chart
-        [view]="[400, 400]"
-        [results]="advancedPieResults()"
-        [scheme]="colorScheme"
-        [animations]="true"
-        [gradient]="false"
-        (select)="onSelect($event)">
-      </ngx-charts-advanced-pie-chart>
-    </div>
 
-    <!-- Bar Chart - Version simplifiée -->
-    <div class="chart-body" *ngIf="type === 'bar'">
-      <ngx-charts-bar-vertical
-        [view]="[600, 400]"
-        [results]="chartResults()"
-        [scheme]="colorScheme"
-        [xAxis]="true"
-        [yAxis]="true"
-        [showXAxisLabel]="true"
-        [showYAxisLabel]="true"
-        [xAxisLabel]="'Catégories'"
-        [yAxisLabel]="'Nombre'"
-        [animations]="true"
-        (select)="onSelect($event)">
-      </ngx-charts-bar-vertical>
+    <!-- ── DONUT ──────────────────────────────────────── -->
+    <div class="chart-body" *ngIf="type === 'donut'">
+      <div class="chart-wrapper">
+
+        <!--
+          FIX SIZING : [view]="chartView" bypass le ResizeSensor interne
+          de ngx-charts et force les dimensions correctes du SVG.
+        -->
+        <ngx-charts-advanced-pie-chart
+          [view]="chartView"
+          [results]="advancedPieResults()"
+          [scheme]="colorScheme"
+          [customColors]="customColors()"
+          [animations]="true"
+          [gradient]="false"
+          (select)="onSelect($event)">
+        </ngx-charts-advanced-pie-chart>
+
+      </div>
+
+      <div class="chart-legend-custom">
+        <div class="legend-item"
+             *ngFor="let item of chartData(); trackBy: trackByLabel">
+          <span class="legend-color"
+                [style.background]="item.color || colorScheme.domain[0]">
+          </span>
+          <span class="legend-label">{{ item.label }}</span>
+          <span class="legend-value">{{ item.value }}</span>
+          <span class="legend-pct"
+                [style.background]="getPctBg(item.color)"
+                [style.color]="getPctColor(item.color)">
+            {{ getPercent(item.value) }}&nbsp;%
+          </span>
+        </div>
+      </div>
     </div>
+    <!-- ── END DONUT ──────────────────────────────────── -->
+
+
+    <!-- ── BAR ───────────────────────────────────────── -->
+    <div class="chart-body" *ngIf="type === 'bar'">
+      <div class="chart-wrapper">
+
+        <!--
+          FIXES BAR CHART :
+          [view]="chartView"             → dimensions SVG correctes
+          [yAxisTickFormatting]          → entiers uniquement sur l'axe Y
+          [yScaleMax]="yScaleMax()"      → headroom 25% au-dessus du max
+                                           évite la barre qui remplit tout
+          [barPadding]="16"              → espace entre barres
+          [roundEdges]="true"            → coins arrondis (top only en ngx)
+        -->
+        <ngx-charts-bar-vertical
+          [view]="chartView"
+          [results]="chartResults()"
+          [scheme]="colorScheme"
+          [customColors]="customColors()"
+          [xAxis]="true"
+          [yAxis]="true"
+          [showXAxisLabel]="false"
+          [showYAxisLabel]="false"
+          [animations]="true"
+          [roundEdges]="true"
+          [showDataLabel]="true"
+          [barPadding]="16"
+          [yScaleMax]="yScaleMax()"
+          [yAxisTickFormatting]="yAxisTickFormatting"
+          (select)="onSelect($event)">
+        </ngx-charts-bar-vertical>
+
+      </div>
+
+      <div class="chart-legend-custom">
+        <div class="legend-item"
+             *ngFor="let item of chartData(); trackBy: trackByLabel">
+          <span class="legend-color"
+                [style.background]="item.color || colorScheme.domain[0]">
+          </span>
+          <span class="legend-label">{{ item.label }}</span>
+          <span class="legend-value">{{ item.value }}</span>
+        </div>
+      </div>
+    </div>
+    <!-- ── END BAR ────────────────────────────────────── -->
 
   </ng-container>
+  <!-- ══ END CONTENT ════════════════════════════════════ -->
 
+
+  <!-- ══ EMPTY STATE ════════════════════════════════════ -->
   <ng-template #emptyState>
     <div class="ui-chart-empty">
-      <i class="bi bi-bar-chart-fill"></i>
-      <span>{{ emptyLabel }}</span>
+      <div class="empty-icon-wrapper">
+        <i class="bi bi-bar-chart-fill"></i>
+      </div>
+      <span class="empty-text">Aucune donnée</span>
+      <span class="empty-hint">{{ emptyLabel }}</span>
     </div>
   </ng-template>
+  <!-- ══ END EMPTY ══════════════════════════════════════ -->
+
 </article>

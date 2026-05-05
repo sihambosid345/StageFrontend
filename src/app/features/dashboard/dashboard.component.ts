@@ -1,8 +1,8 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef, ViewEncapsulation } from '@angular/core';
 import { RouterModule } from '@angular/router';
-import { forkJoin, of } from 'rxjs';
-import { catchError, finalize } from 'rxjs/operators';
+import { of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import {
   Attendance,
   Company,
@@ -49,6 +49,8 @@ interface DashboardHighlight {
   imports: [CommonModule, RouterModule, UiChartComponent],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.scss'],
+  // ✅ CRITIQUE : désactive le scoping CSS pour que les styles s'appliquent vraiment
+  encapsulation: ViewEncapsulation.None,
 })
 export class DashboardComponent implements OnInit {
   loading = true;
@@ -114,105 +116,71 @@ export class DashboardComponent implements OnInit {
 
   loadDashboardData(): void {
     this.loading = true;
-    console.log('🔄 Loading dashboard data...');
-    
+
     const isSuperAdmin = this.auth.isSuperAdmin();
     const canManageUsers = this.auth.isAdmin();
 
-    // Appeler chaque service individuellement pour éviter les problèmes de forkJoin
     this.employeeService.getAll().pipe(
-      catchError(err => {
-        console.error('Error loading employees:', err);
-        return of([]);
-      })
+      catchError(() => of([]))
     ).subscribe(employees => {
       this.employees = employees;
-      console.log(`✅ Employees loaded: ${employees.length}`);
       this.cdr.detectChanges();
       this.checkLoadingComplete();
     });
 
     this.departmentService.getAll().pipe(
-      catchError(err => {
-        console.error('Error loading departments:', err);
-        return of([]);
-      })
+      catchError(() => of([]))
     ).subscribe(departments => {
       this.departments = departments;
-      console.log(`✅ Departments loaded: ${departments.length}`);
       this.cdr.detectChanges();
       this.checkLoadingComplete();
     });
 
     this.companyService.getAll().pipe(
-      catchError(err => {
-        console.error('Error loading companies:', err);
-        return of([]);
-      })
+      catchError(() => of([]))
     ).subscribe(companies => {
       this.companies = companies;
-      console.log(`✅ Companies loaded: ${companies.length}`);
       this.cdr.detectChanges();
       this.checkLoadingComplete();
     });
 
     this.attendanceService.getAll().pipe(
-      catchError(err => {
-        console.error('Error loading attendances:', err);
-        return of([]);
-      })
+      catchError(() => of([]))
     ).subscribe(attendances => {
       this.attendances = attendances;
-      console.log(`✅ Attendances loaded: ${attendances.length}`);
       this.cdr.detectChanges();
       this.checkLoadingComplete();
     });
 
     this.contractService.getAll().pipe(
-      catchError(err => {
-        console.error('Error loading contracts:', err);
-        return of([]);
-      })
+      catchError(() => of([]))
     ).subscribe(contracts => {
       this.contracts = contracts;
-      console.log(`✅ Contracts loaded: ${contracts.length}`);
       this.cdr.detectChanges();
       this.checkLoadingComplete();
     });
 
     this.variableItemService.getAll().pipe(
-      catchError(err => {
-        console.error('Error loading variable items:', err);
-        return of([]);
-      })
+      catchError(() => of([]))
     ).subscribe(variableItems => {
       this.variableItems = variableItems;
-      console.log(`✅ Variable items loaded: ${variableItems.length}`);
       this.cdr.detectChanges();
       this.checkLoadingComplete();
     });
 
     if (isSuperAdmin) {
       this.licenseService.getAll().pipe(
-        catchError(err => {
-          console.error('Error loading licenses:', err);
-          return of([]);
-        })
+        catchError(() => of([]))
       ).subscribe(licenses => {
         this.licenses = licenses;
-        console.log(`✅ Licenses loaded: ${licenses.length}`);
         this.cdr.detectChanges();
         this.checkLoadingComplete();
       });
 
       this.superAdminService.getDashboardStats().pipe(
-        catchError(err => {
-          console.error('Error loading dashboard stats:', err);
-          return of(null);
-        })
+        catchError(() => of(null))
       ).subscribe(stats => {
         this.superAdminStats = stats;
-        console.log('✅ Dashboard stats loaded:', stats);
         this.cdr.detectChanges();
         this.checkLoadingComplete();
       });
@@ -220,57 +188,39 @@ export class DashboardComponent implements OnInit {
 
     if (canManageUsers) {
       this.userService.getAll().pipe(
-        catchError(err => {
-          console.error('Error loading users:', err);
-          return of([]);
-        })
+        catchError(() => of([]))
       ).subscribe(users => {
         this.users = users;
-        console.log(`✅ Users loaded: ${users.length}`);
         this.cdr.detectChanges();
         this.checkLoadingComplete();
       });
     }
 
-    // Timeout pour forcer l'arrêt du chargement si quelque chose bloque
     setTimeout(() => {
       if (this.loading) {
-        console.warn('⚠️ Loading timeout - forcing loading to false');
         this.loading = false;
         this.cdr.detectChanges();
       }
     }, 10000);
   }
 
-  // Compteur pour suivre le chargement des données
   private loadedCount = 0;
   private totalCalls = 0;
 
   private checkLoadingComplete(): void {
     const isSuperAdmin = this.auth.isSuperAdmin();
     const canManageUsers = this.auth.isAdmin();
-    
-    // Calculer le nombre total d'appels attendus
-    let expectedCalls = 6; // employees, departments, companies, attendances, contracts, variableItems
-    
-    if (isSuperAdmin) {
-      expectedCalls += 2; // licenses, superAdminStats
-    }
-    if (canManageUsers) {
-      expectedCalls += 1; // users
-    }
-    
+
+    let expectedCalls = 6;
+    if (isSuperAdmin) expectedCalls += 2;
+    if (canManageUsers) expectedCalls += 1;
+
     this.totalCalls = expectedCalls;
     this.loadedCount++;
-    
-    console.log(`📊 Progress: ${this.loadedCount}/${this.totalCalls} loaded`);
-    
+
     if (this.loadedCount >= this.totalCalls) {
       this.loading = false;
-      console.log('✅ All dashboard data loaded successfully!');
       this.cdr.detectChanges();
-      
-      // Reset counters
       this.loadedCount = 0;
       this.totalCalls = 0;
     }
@@ -279,7 +229,7 @@ export class DashboardComponent implements OnInit {
   get heroTitle(): string {
     return this.auth.isSuperAdmin()
       ? 'Pilotage global de la plateforme RH'
-      : 'Vue d\'ensemble de votre activité RH';
+      : "Vue d'ensemble de votre activité RH";
   }
 
   get heroDescription(): string {
@@ -293,11 +243,12 @@ export class DashboardComponent implements OnInit {
   }
 
   get highlights(): DashboardHighlight[] {
-    const activeEmployees = this.countBy(this.employees, (item) => item.status === 'ACTIVE');
-    const activeContracts = this.countBy(this.contracts, (item) => item.status === 'ACTIVE');
-    const pendingVariables = this.countBy(this.variableItems, (item) => item.status === 'PENDING');
-    const activeCompanies = this.superAdminStats?.companies.active
-      ?? this.countBy(this.companies, (item) => item.status === 'ACTIVE');
+    const activeEmployees = this.countBy(this.employees, (e) => e.status === 'ACTIVE');
+    const activeContracts = this.countBy(this.contracts, (c) => c.status === 'ACTIVE');
+    const pendingVariables = this.countBy(this.variableItems, (v) => v.status === 'PENDING');
+    const activeCompanies =
+      this.superAdminStats?.companies.active ??
+      this.countBy(this.companies, (c) => c.status === 'ACTIVE');
 
     return [
       {
@@ -324,11 +275,12 @@ export class DashboardComponent implements OnInit {
   }
 
   get metrics(): DashboardMetric[] {
-    const activeEmployees = this.countBy(this.employees, (item) => item.status === 'ACTIVE');
-    const activeDepartments = this.countBy(this.departments, (item) => item.isActive);
-    const activeContracts = this.countBy(this.contracts, (item) => item.status === 'ACTIVE');
-    const activeLicenses = this.superAdminStats?.licenses.active
-      ?? this.countBy(this.licenses, (item) => item.status === 'ACTIVE');
+    const activeEmployees = this.countBy(this.employees, (e) => e.status === 'ACTIVE');
+    const activeDepartments = this.countBy(this.departments, (d) => d.isActive);
+    const activeContracts = this.countBy(this.contracts, (c) => c.status === 'ACTIVE');
+    const activeLicenses =
+      this.superAdminStats?.licenses.active ??
+      this.countBy(this.licenses, (l) => l.status === 'ACTIVE');
 
     const cards: DashboardMetric[] = [
       {
@@ -349,15 +301,15 @@ export class DashboardComponent implements OnInit {
         label: this.auth.isSuperAdmin() ? 'Entreprises' : 'Utilisateurs',
         value: this.auth.isSuperAdmin() ? this.companies.length : this.users.length,
         helper: this.auth.isSuperAdmin()
-          ? `${this.superAdminStats?.companies.active ?? this.countBy(this.companies, (item) => item.status === 'ACTIVE')} actives`
-          : `${this.countBy(this.users, (item) => item.status === 'ACTIVE')} actifs`,
+          ? `${this.superAdminStats?.companies.active ?? this.countBy(this.companies, (c) => c.status === 'ACTIVE')} actives`
+          : `${this.countBy(this.users, (u) => u.status === 'ACTIVE')} actifs`,
         icon: this.auth.isSuperAdmin() ? 'bi-buildings-fill' : 'bi-person-badge-fill',
         tone: 'amber',
       },
       {
         label: 'Présences',
         value: this.attendances.length,
-        helper: `${this.countBy(this.attendances, (item) => item.status === 'PRESENT')} présentes`,
+        helper: `${this.countBy(this.attendances, (a) => a.status === 'PRESENT')} présentes`,
         icon: 'bi-calendar2-check-fill',
         tone: 'teal',
       },
@@ -385,43 +337,43 @@ export class DashboardComponent implements OnInit {
 
   get primaryChart(): ChartDatum[] {
     return this.createChartData([
-      ['Actifs', this.countBy(this.employees, (item) => item.status === 'ACTIVE'), '#8b5cf6'],
-      ['Inactifs', this.countBy(this.employees, (item) => item.status === 'INACTIVE'), '#f59e0b'],
-      ['Suspendus', this.countBy(this.employees, (item) => item.status === 'SUSPENDED'), '#ef4444'],
-      ['Sortis', this.countBy(this.employees, (item) => item.status === 'LEFT'), '#64748b'],
+      ['Actifs', this.countBy(this.employees, (e) => e.status === 'ACTIVE'), '#8b5cf6'],
+      ['Inactifs', this.countBy(this.employees, (e) => e.status === 'INACTIVE'), '#f59e0b'],
+      ['Suspendus', this.countBy(this.employees, (e) => e.status === 'SUSPENDED'), '#ef4444'],
+      ['Sortis', this.countBy(this.employees, (e) => e.status === 'LEFT'), '#64748b'],
     ]);
   }
 
   get contractChart(): ChartDatum[] {
     return this.createChartData([
-      ['Actifs', this.countBy(this.contracts, (item) => item.status === 'ACTIVE'), '#10b981'],
-      ['Brouillons', this.countBy(this.contracts, (item) => item.status === 'DRAFT'), '#f59e0b'],
-      ['Terminés', this.countBy(this.contracts, (item) => item.status === 'ENDED' || item.status === 'TERMINATED'), '#ef4444'],
-      ['Suspendus', this.countBy(this.contracts, (item) => item.status === 'SUSPENDED'), '#8b5cf6'],
+      ['Actifs', this.countBy(this.contracts, (c) => c.status === 'ACTIVE'), '#10b981'],
+      ['Brouillons', this.countBy(this.contracts, (c) => c.status === 'DRAFT'), '#f59e0b'],
+      ['Terminés', this.countBy(this.contracts, (c) => c.status === 'ENDED' || c.status === 'TERMINATED'), '#ef4444'],
+      ['Suspendus', this.countBy(this.contracts, (c) => c.status === 'SUSPENDED'), '#8b5cf6'],
     ]);
   }
 
   get attendanceChart(): ChartDatum[] {
     return this.createChartData([
-      ['Présent', this.countBy(this.attendances, (item) => item.status === 'PRESENT'), '#10b981'],
-      ['Absence', this.countBy(this.attendances, (item) => item.status === 'ABSENT'), '#f97316'],
-      ['Congé payé', this.countBy(this.attendances, (item) => item.status === 'PAID_LEAVE'), '#3b82f6'],
-      ['Maladie', this.countBy(this.attendances, (item) => item.status === 'SICK_LEAVE'), '#8b5cf6'],
+      ['Présent', this.countBy(this.attendances, (a) => a.status === 'PRESENT'), '#10b981'],
+      ['Absence', this.countBy(this.attendances, (a) => a.status === 'ABSENT'), '#f97316'],
+      ['Congé payé', this.countBy(this.attendances, (a) => a.status === 'PAID_LEAVE'), '#3b82f6'],
+      ['Maladie', this.countBy(this.attendances, (a) => a.status === 'SICK_LEAVE'), '#8b5cf6'],
     ]);
   }
 
   get licenseChart(): ChartDatum[] {
     return this.createChartData([
-      ['Actives', this.superAdminStats?.licenses.active ?? this.countBy(this.licenses, (item) => item.status === 'ACTIVE'), '#10b981'],
-      ['Essai', this.superAdminStats?.licenses.trial ?? this.countBy(this.licenses, (item) => item.status === 'TRIAL'), '#6366f1'],
-      ['Expirées', this.superAdminStats?.licenses.expired ?? this.countBy(this.licenses, (item) => item.status === 'EXPIRED'), '#ef4444'],
+      ['Actives', this.superAdminStats?.licenses.active ?? this.countBy(this.licenses, (l) => l.status === 'ACTIVE'), '#10b981'],
+      ['Essai', this.superAdminStats?.licenses.trial ?? this.countBy(this.licenses, (l) => l.status === 'TRIAL'), '#6366f1'],
+      ['Expirées', this.superAdminStats?.licenses.expired ?? this.countBy(this.licenses, (l) => l.status === 'EXPIRED'), '#ef4444'],
     ]);
   }
 
   get companyStatusChart(): ChartDatum[] {
     return this.createChartData([
-      ['Actives', this.superAdminStats?.companies.active ?? this.countBy(this.companies, (item) => item.status === 'ACTIVE'), '#3b82f6'],
-      ['Inactives', this.superAdminStats?.companies.inactive ?? this.countBy(this.companies, (item) => item.status !== 'ACTIVE'), '#94a3b8'],
+      ['Actives', this.superAdminStats?.companies.active ?? this.countBy(this.companies, (c) => c.status === 'ACTIVE'), '#3b82f6'],
+      ['Inactives', this.superAdminStats?.companies.inactive ?? this.countBy(this.companies, (c) => c.status !== 'ACTIVE'), '#94a3b8'],
     ]);
   }
 
@@ -430,23 +382,23 @@ export class DashboardComponent implements OnInit {
     const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6', '#f97316', '#14b8a6'];
 
     for (const employee of this.employees) {
-      const departmentName = employee.department?.name || 'Sans département';
-      counts.set(departmentName, (counts.get(departmentName) ?? 0) + 1);
+      const name = employee.department?.name || 'Sans département';
+      counts.set(name, (counts.get(name) ?? 0) + 1);
     }
 
     return Array.from(counts.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
-      .map(([label, value], index) => ({
+      .map(([label, value], i) => ({
         label,
         value,
-        color: colors[index % colors.length],
+        color: colors[i % colors.length],
         helper: value === 1 ? '1 employé' : `${value} employés`,
       }));
   }
 
   get visibleQuickLinks() {
-    return this.quickLinks.filter((item) => this.auth.hasPermission(item.permission));
+    return this.quickLinks.filter((l) => this.auth.hasPermission(l.permission));
   }
 
   get companyHealthLabel(): string {
