@@ -16,6 +16,56 @@ export type LicensePlanCode = 'BASIC' | 'PRO' | 'BUSINESS' | 'ENTERPRISE';
 export type LicenseStatus = 'TRIAL' | 'ACTIVE' | 'EXPIRED' | 'SUSPENDED' | 'CANCELLED';
 export type BillingCycle = 'MONTHLY' | 'YEARLY' | 'LIFETIME';
 
+
+
+// Ajoutez ces types après vos autres interfaces
+
+// ─── PayrollConfig (Configuration de paie) ───────────────────────────────────
+
+export type PayrollRegime = 'MOROCCO_STANDARD';
+
+export interface PayrollConfig {
+  id: string;
+  companyId: string;
+  company?: Pick<Company, 'id' | 'name' | 'status'>;
+  regime: PayrollRegime;
+  currency: string;
+  weeklyHours: number | null;
+  monthlyHours: number | null;
+  workingDaysPerMonth: number | null;
+  cnssEnabled: boolean;
+  amoEnabled: boolean;
+  irEnabled: boolean;
+  cimrEnabled: boolean;
+  defaultCnssDeclaredDays: number | null;
+  payslipTemplate?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreatePayrollConfigPayload {
+  companyId: string;
+  regime?: PayrollRegime;
+  currency?: string;
+  weeklyHours?: number;
+  monthlyHours?: number;
+  workingDaysPerMonth?: number;
+  cnssEnabled?: boolean;
+  amoEnabled?: boolean;
+  irEnabled?: boolean;
+  cimrEnabled?: boolean;
+  defaultCnssDeclaredDays?: number;
+  payslipTemplate?: string;
+  notes?: string;
+}
+
+export type UpdatePayrollConfigPayload = Partial<Omit<CreatePayrollConfigPayload, 'companyId'>>;
+
+// Liste des options pour les dropdowns
+export const PAYROLL_REGIME_OPTIONS: PayrollRegime[] = ['MOROCCO_STANDARD'];
+export const CURRENCY_OPTIONS: string[] = ['MAD', 'EUR', 'USD', 'GBP'];
+
 // ─── Enum lists for dropdowns ─────────────────────────────────────────────────
 
 export const COMPANY_STATUS_OPTIONS: CompanyStatus[] = ['ACTIVE', 'INACTIVE', 'SUSPENDED'];

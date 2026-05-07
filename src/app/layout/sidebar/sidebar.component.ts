@@ -45,7 +45,13 @@ export class SidebarComponent {
         { label: 'Éléments variables', icon: 'bi-sliders',                   route: '/variable-items', permission: 'contracts' },
       ]
     },
-   
+    {
+      label: 'Paie', icon: 'bi-cash-stack', expanded: false,
+      children: [
+      
+        { label: 'Configuration', icon: 'bi-gear-fill',                  route: '/payroll/config',   permission: 'payroll' } 
+      ]
+    },
     { label: 'Utilisateurs', icon: 'bi-person-gear-fill', route: '/users', permission: 'users' },
   ];
 
@@ -57,13 +63,13 @@ export class SidebarComponent {
   isVisible(item: NavItem): boolean {
     if (item.children) {
       return item.children.some(c => {
-        if (c.permission === 'licenses' || c.permission === 'companies') {
+        if (c.permission === 'licenses') {
           return this.auth.isSuperAdmin();
         }
         return this.auth.hasPermission(c.permission ?? '');
       });
     }
-    if (item.permission === 'licenses' || item.permission === 'companies') {
+    if (item.permission === 'licenses') {
       return this.auth.isSuperAdmin();
     }
     return this.auth.hasPermission(item.permission ?? '');
@@ -72,7 +78,7 @@ export class SidebarComponent {
   visibleChildren(item: NavItem): NavItem[] {
     if (!item.children) return [];
     return item.children.filter(c => {
-      if (c.permission === 'licenses' || c.permission === 'companies') {
+      if (c.permission === 'licenses') {
         return this.auth.isSuperAdmin();
       }
       return this.auth.hasPermission(c.permission ?? '');
@@ -95,6 +101,16 @@ export class SidebarComponent {
   }
 
   get userRole(): string {
-    return this.auth.currentUser()?.role ?? 'USER';
+    const role = this.auth.currentUser()?.role ?? 'USER';
+    // Traduire les rôles en français pour l'affichage
+    const roleLabels: { [key: string]: string } = {
+      'SUPER_ADMIN': 'Super Administrateur',
+      'ADMIN': 'Administrateur',
+      'HR_MANAGER': 'Responsable RH',
+      'PAYROLL_MANAGER': 'Responsable Paie',
+      'EMPLOYEE': 'Employé',
+      'VIEWER': 'Visiteur'
+    };
+    return roleLabels[role] || role;
   }
 }

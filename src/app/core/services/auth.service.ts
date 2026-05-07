@@ -84,15 +84,23 @@ export class AuthService {
   constructor(private http: HttpClient, private router: Router) {}
 
   login(payload: LoginPayload): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${API_URL}/auth/login`, payload).pipe(
-      tap((res) => {
-        localStorage.setItem(TOKEN_KEY, res.token);
-        localStorage.setItem(USER_KEY, JSON.stringify(res.user));
-        this._token.set(res.token);
-        this._user.set(res.user);
-      })
-    );
-  }
+  return this.http.post<AuthResponse>(`${API_URL}/auth/login`, payload).pipe(
+    tap((res) => {
+      // ✅ FORCER isSuperAdmin en fonction du rôle si absent
+      const userWithSuperAdmin = {
+        ...res.user,
+        isSuperAdmin: res.user.isSuperAdmin === true || res.user.role === 'SUPER_ADMIN'
+      };
+      
+      localStorage.setItem(TOKEN_KEY, res.token);
+      localStorage.setItem(USER_KEY, JSON.stringify(userWithSuperAdmin));
+      this._token.set(res.token);
+      this._user.set(userWithSuperAdmin);
+      
+      console.log('User after login:', userWithSuperAdmin);
+    })
+  );
+}
 
   logout(): void {
     localStorage.removeItem(TOKEN_KEY);

@@ -158,6 +158,175 @@ export class UserService {
   delete(id: string): Observable<any>                   { return this.api.delete(`/users/${id}`); }
 }
 
+// ── Services de paie (Payroll) ──────────────────────────────────────────────
+
+@Injectable({ providedIn: 'root' })
+export class PayrollPeriodService {
+  constructor(private api: ApiService) {}
+  
+  getAll(): Observable<PayrollPeriod[]> {
+    return this.api.get('/payroll-periods');
+  }
+  
+  getById(id: string): Observable<PayrollPeriod> {
+    return this.api.get(`/payroll-periods/${id}`);
+  }
+  
+  getByCompany(companyId: string): Observable<PayrollPeriod[]> {
+    return this.api.get(`/payroll-periods/company/${companyId}`);
+  }
+  
+  getActivePeriod(companyId: string): Observable<PayrollPeriod> {
+    return this.api.get(`/payroll-periods/company/${companyId}/active`);
+  }
+  
+  create(data: Partial<PayrollPeriod>): Observable<PayrollPeriod> {
+    return this.api.post('/payroll-periods', data);
+  }
+  
+  update(id: string, data: Partial<PayrollPeriod>): Observable<PayrollPeriod> {
+    return this.api.put(`/payroll-periods/${id}`, data);
+  }
+  
+  delete(id: string): Observable<any> {
+    return this.api.delete(`/payroll-periods/${id}`);
+  }
+  
+  closePeriod(id: string): Observable<PayrollPeriod> {
+    return this.api.post(`/payroll-periods/${id}/close`, {});
+  }
+}
+
+@Injectable({ providedIn: 'root' })
+export class PayrollRunService {
+  constructor(private api: ApiService) {}
+  
+  getAll(): Observable<PayrollRun[]> {
+    return this.api.get('/payroll-runs');
+  }
+  
+  getById(id: string): Observable<PayrollRun> {
+    return this.api.get(`/payroll-runs/${id}`);
+  }
+  
+  getByPeriod(periodId: string): Observable<PayrollRun[]> {
+    return this.api.get(`/payroll-runs/period/${periodId}`);
+  }
+  
+  getByCompany(companyId: string): Observable<PayrollRun[]> {
+    return this.api.get(`/payroll-runs/company/${companyId}`);
+  }
+  
+  create(data: Partial<PayrollRun>): Observable<PayrollRun> {
+    return this.api.post('/payroll-runs', data);
+  }
+  
+  update(id: string, data: Partial<PayrollRun>): Observable<PayrollRun> {
+    return this.api.put(`/payroll-runs/${id}`, data);
+  }
+  
+  delete(id: string): Observable<any> {
+    return this.api.delete(`/payroll-runs/${id}`);
+  }
+  
+  processRun(id: string): Observable<PayrollRun> {
+    return this.api.post(`/payroll-runs/${id}/process`, {});
+  }
+  
+  approveRun(id: string): Observable<PayrollRun> {
+    return this.api.post(`/payroll-runs/${id}/approve`, {});
+  }
+}
+
+@Injectable({ providedIn: 'root' })
+export class PayrollItemService {
+  constructor(private api: ApiService) {}
+  
+  getAll(): Observable<PayrollItem[]> {
+    return this.api.get('/payroll-items');
+  }
+  
+  getById(id: string): Observable<PayrollItem> {
+    return this.api.get(`/payroll-items/${id}`);
+  }
+  
+  getByRun(runId: string): Observable<PayrollItem[]> {
+    return this.api.get(`/payroll-items/run/${runId}`);
+  }
+  
+  getByEmployee(employeeId: string): Observable<PayrollItem[]> {
+    return this.api.get(`/payroll-items/employee/${employeeId}`);
+  }
+  
+  create(data: Partial<PayrollItem>): Observable<PayrollItem> {
+    return this.api.post('/payroll-items', data);
+  }
+  
+  update(id: string, data: Partial<PayrollItem>): Observable<PayrollItem> {
+    return this.api.put(`/payroll-items/${id}`, data);
+  }
+  
+  delete(id: string): Observable<any> {
+    return this.api.delete(`/payroll-items/${id}`);
+  }
+  
+  bulkCreate(items: Partial<PayrollItem>[]): Observable<PayrollItem[]> {
+    return this.api.post('/payroll-items/bulk', { items });
+  }
+}
+
+@Injectable({ providedIn: 'root' })
+export class PayslipService {
+  constructor(private api: ApiService) {}
+  
+  getAll(): Observable<Payslip[]> {
+    return this.api.get('/payslips');
+  }
+  
+  getById(id: string): Observable<Payslip> {
+    return this.api.get(`/payslips/${id}`);
+  }
+  
+  getByRun(runId: string): Observable<Payslip[]> {
+    return this.api.get(`/payslips/run/${runId}`);
+  }
+  
+  getByEmployee(employeeId: string): Observable<Payslip[]> {
+    return this.api.get(`/payslips/employee/${employeeId}`);
+  }
+  
+  // Méthodes CRUD ajoutées
+  create(data: Partial<Payslip>): Observable<Payslip> {
+    return this.api.post('/payslips', data);
+  }
+  
+  update(id: string, data: Partial<Payslip>): Observable<Payslip> {
+    return this.api.put(`/payslips/${id}`, data);
+  }
+  
+  generatePayslip(runId: string, employeeId: string): Observable<Payslip> {
+    return this.api.post(`/payslips/generate`, { runId, employeeId });
+  }
+  
+  generateAllForRun(runId: string): Observable<Payslip[]> {
+    return this.api.post(`/payslips/generate-all/${runId}`, {});
+  }
+  
+  downloadPdf(id: string): Observable<Blob> {
+    return this.api.get(`/payslips/${id}/pdf`, { responseType: 'blob' });
+  }
+  
+  sendByEmail(id: string): Observable<{ message: string }> {
+    return this.api.post(`/payslips/${id}/send-email`, {});
+  }
+  
+  delete(id: string): Observable<any> {
+    return this.api.delete(`/payslips/${id}`);
+  }
+}
+
+// ── Service Super Admin ─────────────────────────────────────────────────────
+
 /**
  * Service dédié au super admin
  * Utilise les routes /super-admin/* pour les opérations d'administration globale

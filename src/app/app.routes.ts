@@ -66,6 +66,22 @@ export const routes: Routes = [
         path: 'users',
         canActivate: [permissionGuard('users')],
         loadComponent: () => import('./features/users/users.component').then(m => m.UsersComponent)
+      },
+      // ========== ROUTES PAYROLL AVEC CONFIG ==========
+      {
+        path: 'payroll',
+        canActivate: [permissionGuard('payroll')],
+        children: [
+          {
+            path: '',
+            redirectTo: 'runs',
+            pathMatch: 'full'
+          },
+          {
+            path: 'config',
+            loadComponent: () => import('./features/payroll/config/config.component').then(m => m.PayrollConfigComponent)
+          }
+        ]
       }
     ]
   },

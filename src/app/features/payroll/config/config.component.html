@@ -1,0 +1,375 @@
+<div class="pc-wrapper">
+
+  
+
+  <!-- Header -->
+  <div class="pc-header">
+    <div class="pc-header__left">
+      <div class="pc-header__icon">⚙️</div>
+      <div>
+        <h1 class="pc-header__title">Configuration de la paie</h1>
+        <p class="pc-header__sub">Paramètres de calcul par entreprise</p>
+      </div>
+    </div>
+    <!-- Bouton Ajouter - visible pour Super Admin -->
+    <button class="pc-btn pc-btn--primary" (click)="openAddModal()" *ngIf="isSuperAdmin">
+      <span>＋</span> Nouvelle configuration
+    </button>
+  </div>
+  <!-- Alertes -->
+  <div class="pc-alert pc-alert--success" *ngIf="successMessage">
+    <span>✓</span> {{ successMessage }}
+  </div>
+  <div class="pc-alert pc-alert--error" *ngIf="errorMessage && !showModal">
+    <span>✕</span> {{ errorMessage }}
+  </div>
+
+  <!-- Stats (Super Admin) -->
+  <div class="pc-stats" *ngIf="isSuperAdmin">
+    <div class="pc-stat">
+      <span class="pc-stat__num">{{ configurations.length }}</span>
+      <span class="pc-stat__lbl">Total configs</span>
+    </div>
+    <div class="pc-stat">
+      <span class="pc-stat__num">{{ getActiveCount() }}</span>
+      <span class="pc-stat__lbl">Modules actifs</span>
+    </div>
+    <div class="pc-stat">
+      <span class="pc-stat__num">{{ companies.length }}</span>
+      <span class="pc-stat__lbl">Entreprises</span>
+    </div>
+  </div>
+
+  <!-- Recherche -->
+  <div class="pc-toolbar" *ngIf="isSuperAdmin">
+    <div class="pc-search">
+      <svg class="pc-search__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+      <input
+        class="pc-search__input"
+        type="text"
+        placeholder="Rechercher par entreprise, régime, devise…"
+        [(ngModel)]="searchTerm"
+        (input)="applySearch()"
+      />
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="pc-loading" *ngIf="loading">
+    <div class="pc-spinner"></div>
+    <span>Chargement…</span>
+  </div>
+
+  <!-- Table -->
+  <div class="pc-card" *ngIf="!loading">
+    <table class="pc-table">
+      <thead>
+        <tr>
+          <th *ngIf="isSuperAdmin">ENTREPRISE</th>
+          <th>RÉGIME</th>
+          <th>DEVISE</th>
+          <th>H/SEMAINE</th>
+          <th>H/MOIS</th>
+          <th>JOURS/MOIS</th>
+          <th>MODULES</th>
+          <th>JOURS CNSS</th>
+          <th>ACTIONS</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let config of filteredConfigs" class="pc-table__row">
+
+          <!-- Entreprise -->
+          <td *ngIf="isSuperAdmin">
+            <div class="pc-company">
+              <div class="pc-company__avatar">{{ getCompanyName(config).charAt(0) }}</div>
+              <div>
+                <div class="pc-company__name">{{ getCompanyName(config) }}</div>
+                <div class="pc-company__status" [class.active]="config.company?.status === 'ACTIVE'">
+                  {{ config.company?.status || '—' }}
+                </div>
+              </div>
+            </div>
+          </td>
+
+          <!-- Régime -->
+          <td>
+            <span class="pc-badge pc-badge--regime">{{ formatRegime(config.regime) }}</span>
+          </td>
+
+          <!-- Devise -->
+          <td><span class="pc-badge pc-badge--currency">{{ config.currency }}</span></td>
+
+          <!-- Heures semaine -->
+          <td class="pc-num">{{ config.weeklyHours !== null ? (config.weeklyHours + 'h') : '—' }}</td>
+
+          <!-- Heures mois -->
+          <td class="pc-num">{{ config.monthlyHours !== null ? (config.monthlyHours + 'h') : '—' }}</td>
+
+          <!-- Jours mois -->
+          <td class="pc-num">{{ config.workingDaysPerMonth !== null ? (config.workingDaysPerMonth + 'j') : '—' }}</td>
+
+          <!-- Modules -->
+          <td>
+            <div class="pc-modules">
+              <span class="pc-module" [class.on]="config.cnssEnabled">CNSS</span>
+              <span class="pc-module" [class.on]="config.amoEnabled">AMO</span>
+              <span class="pc-module" [class.on]="config.irEnabled">IR</span>
+              <span class="pc-module" [class.on]="config.cimrEnabled">CIMR</span>
+            </div>
+          </td>
+
+          <!-- Jours CNSS -->
+          <td class="pc-num">{{ config.defaultCnssDeclaredDays ?? '—' }}</td>
+
+          <!-- Actions -->
+          <td>
+            <div class="pc-actions">
+              <button class="pc-action pc-action--edit" (click)="editConfig(config)" title="Modifier">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+              </button>
+              <!-- Bouton Supprimer - visible pour Super Admin -->
+              <button class="pc-action pc-action--delete" (click)="deleteConfig(config.id)"
+                      title="Supprimer" *ngIf="isSuperAdmin">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                  <path d="M10 11v6M14 11v6"/>
+                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                </svg>
+              </button>
+            </div>
+          </td>
+        </tr>
+
+        <tr *ngIf="filteredConfigs.length === 0">
+          <td [attr.colspan]="isSuperAdmin ? 9 : 8" class="pc-empty">
+            <div>📋</div>
+            <span>Aucune configuration trouvée</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-backdrop" *ngIf="showModal" (click)="closeModalOnBackdrop($event)">
+  <div class="modal-box">
+
+    <!-- Header modal -->
+    <div class="modal-head">
+      <div class="modal-head__title">
+        <span class="modal-head__icon">{{ editingConfig ? '✏️' : '＋' }}</span>
+        {{ editingConfig ? 'Modifier la configuration' : 'Nouvelle configuration' }}
+      </div>
+      <button class="modal-head__close" (click)="closeModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M18 6 6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Erreur dans modal -->
+    <div class="pc-alert pc-alert--error modal-error" *ngIf="errorMessage">
+      <span>✕</span> {{ errorMessage }}
+    </div>
+
+    <!-- Formulaire -->
+    <div class="modal-body" [formGroup]="configForm">
+
+      <!-- Entreprise (visible uniquement pour Super Admin en création) -->
+      <div class="form-section" *ngIf="isSuperAdmin && !editingConfig">
+        <div class="form-section__title">
+          <span class="form-section__dot"></span> Entreprise
+        </div>
+        <div class="form-field" [class.invalid]="isFieldInvalid('companyId')">
+          <label class="form-label">Entreprise <span class="req">*</span></label>
+          <select class="form-select" formControlName="companyId">
+            <option value="">-- Sélectionner une entreprise --</option>
+            <option *ngFor="let company of companies" [value]="company.id">
+              {{ company.name }}
+            </option>
+          </select>
+          <span class="form-error" *ngIf="isFieldInvalid('companyId')">Champ requis</span>
+        </div>
+      </div>
+
+      <!-- Paramètres généraux -->
+      <div class="form-section">
+        <div class="form-section__title">
+          <span class="form-section__dot"></span> Paramètres généraux
+        </div>
+        <div class="form-row form-row--2">
+
+          <div class="form-field" [class.invalid]="isFieldInvalid('regime')">
+            <label class="form-label">Régime <span class="req">*</span></label>
+            <select class="form-select" formControlName="regime">
+              <option *ngFor="let r of regimeOptions" [value]="r.value">{{ r.label }}</option>
+            </select>
+            <span class="form-error" *ngIf="isFieldInvalid('regime')">Champ requis</span>
+          </div>
+
+          <div class="form-field" [class.invalid]="isFieldInvalid('currency')">
+            <label class="form-label">Devise <span class="req">*</span></label>
+            <select class="form-select" formControlName="currency">
+              <option *ngFor="let c of currencyOptions" [value]="c.value">{{ c.label }}</option>
+            </select>
+            <span class="form-error" *ngIf="isFieldInvalid('currency')">Champ requis</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Heures & jours -->
+      <div class="form-section">
+        <div class="form-section__title">
+          <span class="form-section__dot"></span> Heures & jours de travail
+        </div>
+        <div class="form-row form-row--3">
+
+          <div class="form-field" [class.invalid]="isFieldInvalid('weeklyHours')">
+            <label class="form-label">Heures / semaine <span class="req">*</span></label>
+            <div class="form-input-wrap">
+              <input class="form-input" type="number" step="0.01" min="0" max="168"
+                     formControlName="weeklyHours" placeholder="44">
+              <span class="form-unit">h</span>
+            </div>
+            <span class="form-hint">Standard Maroc : 44h</span>
+            <span class="form-error" *ngIf="isFieldInvalid('weeklyHours')">0 — 168</span>
+          </div>
+
+          <div class="form-field" [class.invalid]="isFieldInvalid('monthlyHours')">
+            <label class="form-label">Heures / mois <span class="req">*</span></label>
+            <div class="form-input-wrap">
+              <input class="form-input" type="number" step="0.01" min="0"
+                     formControlName="monthlyHours" placeholder="191.33">
+              <span class="form-unit">h</span>
+            </div>
+            <span class="form-hint">Standard : 191.33h</span>
+            <span class="form-error" *ngIf="isFieldInvalid('monthlyHours')">Valeur invalide</span>
+          </div>
+
+          <div class="form-field" [class.invalid]="isFieldInvalid('workingDaysPerMonth')">
+            <label class="form-label">Jours travaillés / mois <span class="req">*</span></label>
+            <div class="form-input-wrap">
+              <input class="form-input" type="number" step="1" min="1" max="31"
+                     formControlName="workingDaysPerMonth" placeholder="26">
+              <span class="form-unit">j</span>
+            </div>
+            <span class="form-hint">1 — 31 jours</span>
+            <span class="form-error" *ngIf="isFieldInvalid('workingDaysPerMonth')">1 — 31</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modules de cotisation -->
+      <div class="form-section">
+        <div class="form-section__title">
+          <span class="form-section__dot"></span> Modules de cotisation
+        </div>
+        <div class="form-checkboxes">
+
+          <label class="form-check">
+            <input type="checkbox" formControlName="cnssEnabled" class="form-check__input">
+            <span class="form-check__box"></span>
+            <div class="form-check__content">
+              <span class="form-check__label">CNSS</span>
+              <span class="form-check__desc">Caisse Nationale de Sécurité Sociale</span>
+            </div>
+          </label>
+
+          <label class="form-check">
+            <input type="checkbox" formControlName="amoEnabled" class="form-check__input">
+            <span class="form-check__box"></span>
+            <div class="form-check__content">
+              <span class="form-check__label">AMO</span>
+              <span class="form-check__desc">Assurance Maladie Obligatoire</span>
+            </div>
+          </label>
+
+          <label class="form-check">
+            <input type="checkbox" formControlName="irEnabled" class="form-check__input">
+            <span class="form-check__box"></span>
+            <div class="form-check__content">
+              <span class="form-check__label">IR</span>
+              <span class="form-check__desc">Impôt sur le Revenu</span>
+            </div>
+          </label>
+
+          <label class="form-check">
+            <input type="checkbox" formControlName="cimrEnabled" class="form-check__input">
+            <span class="form-check__box"></span>
+            <div class="form-check__content">
+              <span class="form-check__label">CIMR</span>
+              <span class="form-check__desc">Caisse Interprofessionnelle Marocaine de Retraite</span>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Déclaration CNSS -->
+      <div class="form-section">
+        <div class="form-section__title">
+          <span class="form-section__dot"></span> Déclaration CNSS
+        </div>
+        <div class="form-row form-row--2">
+
+          <div class="form-field" [class.invalid]="isFieldInvalid('defaultCnssDeclaredDays')">
+            <label class="form-label">
+              Jours déclarés CNSS par défaut <span class="req">*</span>
+            </label>
+            <div class="form-input-wrap">
+              <input class="form-input" type="number" step="1" min="1" max="31"
+                     formControlName="defaultCnssDeclaredDays" placeholder="26">
+              <span class="form-unit">j</span>
+            </div>
+            <span class="form-hint">Nombre de jours déclarés par défaut (Int, 1—31)</span>
+            <span class="form-error" *ngIf="isFieldInvalid('defaultCnssDeclaredDays')">1 — 31</span>
+          </div>
+
+          <div class="form-field">
+            <label class="form-label">Template bulletin de paie</label>
+            <select class="form-select" formControlName="payslipTemplate">
+              <option value="">Standard (défaut)</option>
+              <option value="DETAILED">Détaillé</option>
+              <option value="SIMPLIFIED">Simplifié</option>
+            </select>
+            <span class="form-hint">Format du bulletin généré</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div class="form-section">
+        <div class="form-section__title">
+          <span class="form-section__dot"></span> Notes internes
+        </div>
+        <div class="form-field">
+          <label class="form-label">Notes <span class="form-optional">(optionnel)</span></label>
+          <textarea class="form-textarea" formControlName="notes" rows="3"
+                    placeholder="Remarques sur cette configuration…"></textarea>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Footer modal -->
+    <div class="modal-foot">
+      <button class="pc-btn pc-btn--ghost" type="button" (click)="closeModal()">
+        Annuler
+      </button>
+      <button class="pc-btn pc-btn--primary" type="button"
+              (click)="saveConfig()"
+              [disabled]="configForm.invalid || saving">
+        <span *ngIf="!saving">{{ editingConfig ? 'Mettre à jour' : 'Enregistrer' }}</span>
+        <span *ngIf="saving" class="btn-spinner"></span>
+        <span *ngIf="saving">Enregistrement…</span>
+      </button>
+    </div>
+  </div>
+</div>
