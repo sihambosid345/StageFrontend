@@ -23,6 +23,7 @@ export const routes: Routes = [
         loadComponent: () => import('./features/dashboard/dashboard.component').then(m => m.DashboardComponent)
       },
       {
+        // Accessible au super admin (via guard 'companies') ET aux admins avec permission
         path: 'companies',
         canActivate: [permissionGuard('companies')],
         loadComponent: () => import('./features/companies/companies.component').then(m => m.CompaniesComponent)
@@ -53,9 +54,35 @@ export const routes: Routes = [
         loadComponent: () => import('./features/contracts/contracts.component').then(m => m.ContractsComponent)
       },
       {
+        // Licences : super admin seulement (guard vérifie isSuperAdmin)
         path: 'licenses',
         canActivate: [permissionGuard('licenses')],
         loadComponent: () => import('./features/licenses/licenses.component').then(m => m.LicensesComponent)
+      },
+       {
+            path: 'payroll/config',
+            canActivate: [permissionGuard('payroll')],
+            loadComponent: () => import('./features/payroll/config/config.component').then(m => m.PayrollConfigComponent)
+          },
+      {
+        path: 'payroll/periods',
+        canActivate: [permissionGuard('payroll')],
+        loadComponent: () => import('./features/payroll/periods/periods.component').then(m => m.PeriodsComponent)
+      },
+      {
+        path: 'payroll/runs',
+        canActivate: [permissionGuard('payroll')],
+        loadComponent: () => import('./features/payroll/runs/runs.component').then(m => m.RunsComponent)
+      },
+      {
+        path: 'payroll/items',
+        canActivate: [permissionGuard('payroll')],
+        loadComponent: () => import('./features/payroll/items/items.component').then(m => m.ItemsComponent)
+      },
+      {
+        path: 'payroll/payslips',
+        canActivate: [permissionGuard('payroll')],
+        loadComponent: () => import('./features/payroll/payslips/payslips.component').then(m => m.PayslipsComponent)
       },
       {
         path: 'variable-items',
@@ -66,22 +93,6 @@ export const routes: Routes = [
         path: 'users',
         canActivate: [permissionGuard('users')],
         loadComponent: () => import('./features/users/users.component').then(m => m.UsersComponent)
-      },
-      // ========== ROUTES PAYROLL AVEC CONFIG ==========
-      {
-        path: 'payroll',
-        canActivate: [permissionGuard('payroll')],
-        children: [
-          {
-            path: '',
-            redirectTo: 'runs',
-            pathMatch: 'full'
-          },
-          {
-            path: 'config',
-            loadComponent: () => import('./features/payroll/config/config.component').then(m => m.PayrollConfigComponent)
-          }
-        ]
       }
     ]
   },

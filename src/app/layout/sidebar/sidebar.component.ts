@@ -48,8 +48,13 @@ export class SidebarComponent {
     {
       label: 'Paie', icon: 'bi-cash-stack', expanded: false,
       children: [
-      
-        { label: 'Configuration', icon: 'bi-gear-fill',                  route: '/payroll/config',   permission: 'payroll' } 
+        { label: 'Configuration', icon: 'bi-gear-fill',                  route: '/payroll/config',   permission: 'payroll' },
+
+        { label: 'Périodes',       icon: 'bi-calendar3',                    route: '/payroll/periods',  permission: 'payroll' },
+        { label: 'Exécutions',     icon: 'bi-play-circle-fill',             route: '/payroll/runs',     permission: 'payroll' },
+        { label: 'Lignes de paie', icon: 'bi-list-columns',                 route: '/payroll/items',    permission: 'payroll' },
+        { label: 'Bulletins',      icon: 'bi-file-earmark-richtext-fill',   route: '/payroll/payslips', permission: 'payroll' },
+
       ]
     },
     { label: 'Utilisateurs', icon: 'bi-person-gear-fill', route: '/users', permission: 'users' },
@@ -101,16 +106,6 @@ export class SidebarComponent {
   }
 
   get userRole(): string {
-    const role = this.auth.currentUser()?.role ?? 'USER';
-    // Traduire les rôles en français pour l'affichage
-    const roleLabels: { [key: string]: string } = {
-      'SUPER_ADMIN': 'Super Administrateur',
-      'ADMIN': 'Administrateur',
-      'HR_MANAGER': 'Responsable RH',
-      'PAYROLL_MANAGER': 'Responsable Paie',
-      'EMPLOYEE': 'Employé',
-      'VIEWER': 'Visiteur'
-    };
-    return roleLabels[role] || role;
+    return this.auth.currentUser()?.role ?? 'USER';
   }
 }
