@@ -1,9 +1,9 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef, NgZone } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpHeaders, HttpErrorResponse } from '@angular/common/http';
-import { Observable, catchError, finalize, of } from 'rxjs';
+import { Observable, catchError, finalize, of, firstValueFrom } from 'rxjs';
 
 export interface PayrollConfig {
   id: string;
@@ -56,6 +56,7 @@ export class PayrollConfigComponent implements OnInit {
   editingConfig: PayrollConfig | null = null;
   errorMessage = '';
   successMessage = '';
+  dataLoaded = false; // Nouveau flag pour suivre l'état du chargement
 
   // Variable pour suivre si l'API a répondu
   apiResponded = false;
@@ -98,7 +99,12 @@ export class PayrollConfigComponent implements OnInit {
     { value: 'SIMPLIFIED', label: 'Simplifié' },
   ];
 
-  constructor(private fb: FormBuilder, private http: HttpClient) {
+  constructor(
+    private fb: FormBuilder, 
+    private http: HttpClient,
+    private cdr: ChangeDetectorRef,
+    private ngZone: NgZone
+  ) {
     this.configForm = this.fb.group({
       companyId: [''],
       regime: ['MOROCCO_STANDARD', Validators.required],
@@ -122,13 +128,54 @@ export class PayrollConfigComponent implements OnInit {
     console.log('Token exists:', !!localStorage.getItem('token'));
     console.log('API URL:', this.apiUrl);
     
-    // Charger les configurations immédiatement
-    this.loadConfigurations();
-    
-    if (this.isSuperAdmin) {
-      console.log('Loading companies for Super Admin');
-      this.loadCompanies();
+    // Initialisation sécurisée avec NgZone
+    this.initializeData();
+  }
+
+  /**
+   * Méthode d'initialisation robuste qui garantit le chargement des données
+   */
+  private async initializeData(): Promise<void> {
+    try {
+      // Étape 1: Attendre que le composant soit complètement initialisé
+      await this.waitForStableState();
+      
+      // Étape 2: Charger les données dans la zone Angular
+      this.ngZone.run(() => {
+        this.loadConfigurations();
+        
+        if (this.isSuperAdmin) {
+          console.log('Loading companies for Super Admin');
+          this.loadCompanies();
+        }
+      });
+      
+      // Étape 3: Forcer la détection de changement après un court délai
+      setTimeout(() => {
+        this.cdr.detectChanges();
+      }, 50);
+      
+    } catch (error) {
+      console.error('Erreur d\'initialisation:', error);
     }
+  }
+
+  /**
+   * Attendre que l'état soit stable avant de charger les données
+   */
+  private waitForStableState(): Promise<void> {
+    return new Promise((resolve) => {
+      if (this.ngZone.isStable) {
+        // Déjà stable, attendre le prochain cycle
+        setTimeout(() => resolve(), 0);
+      } else {
+        // Attendre que la zone soit stable
+        const subscription = this.ngZone.onStable.subscribe(() => {
+          subscription.unsubscribe();
+          setTimeout(() => resolve(), 0);
+        });
+      }
+    });
   }
 
   loadCompanies() {
@@ -145,15 +192,28 @@ export class PayrollConfigComponent implements OnInit {
       )
       .subscribe({
         next: (data) => {
-          console.log('Companies loaded:', data?.length || 0);
-          console.log('Companies data:', data);
-          this.companies = data || [];
-          this.apiResponded = true;
+          this.ngZone.run(() => {
+            console.log('Companies loaded:', data?.length || 0);
+            console.log('Companies data:', data);
+            this.companies = data || [];
+            this.apiResponded = true;
+            this.dataLoaded = true;
+            
+            // Forcer la détection de changement
+            this.cdr.markForCheck();
+            this.cdr.detectChanges();
+            
+            console.log('Companies updated in view');
+          });
         },
         error: (err) => {
-          console.error('Companies subscription error:', err);
-          this.companies = [];
-          this.apiResponded = true;
+          this.ngZone.run(() => {
+            console.error('Companies subscription error:', err);
+            this.companies = [];
+            this.apiResponded = true;
+            this.dataLoaded = true;
+            this.cdr.detectChanges();
+          });
         }
       });
   }
@@ -198,35 +258,79 @@ export class PayrollConfigComponent implements OnInit {
       )
       .subscribe({
         next: (data) => {
-          console.log('=== DATA RECEIVED ===');
-          console.log('Raw data type:', typeof data);
-          console.log('Is array:', Array.isArray(data));
-          console.log('Raw data:', JSON.stringify(data, null, 2));
-          
-          if (Array.isArray(data) && data.length > 0) {
-            this.configurations = data;
-          } else if (data && !Array.isArray(data)) {
-            this.configurations = [data as PayrollConfig];
-          } else if (Array.isArray(data) && data.length === 0) {
-            this.configurations = [];
-            this.errorMessage = 'Aucune configuration trouvée. Cliquez sur "Nouvelle configuration" pour en créer une.';
-          } else {
-            this.configurations = [];
-            this.errorMessage = 'Format de données invalide reçu du serveur.';
-          }
-          
-          this.filteredConfigs = [...this.configurations];
-          console.log('Configurations count:', this.configurations.length);
-          console.log('First config:', this.configurations[0]);
-          console.log('Filtered configs count:', this.filteredConfigs.length);
+          this.ngZone.run(() => {
+            console.log('=== DATA RECEIVED ===');
+            console.log('Raw data type:', typeof data);
+            console.log('Is array:', Array.isArray(data));
+            console.log('Raw data:', JSON.stringify(data, null, 2));
+            
+            // Réinitialiser le message d'erreur si on reçoit des données
+            this.errorMessage = '';
+            
+            if (Array.isArray(data) && data.length > 0) {
+              this.configurations = data;
+              this.dataLoaded = true;
+            } else if (data && !Array.isArray(data)) {
+              this.configurations = [data as PayrollConfig];
+              this.dataLoaded = true;
+            } else if (Array.isArray(data) && data.length === 0) {
+              this.configurations = [];
+              this.errorMessage = 'Aucune configuration trouvée. Cliquez sur "Nouvelle configuration" pour en créer une.';
+              this.dataLoaded = true;
+            } else {
+              this.configurations = [];
+              this.errorMessage = 'Format de données invalide reçu du serveur.';
+              this.dataLoaded = true;
+            }
+            
+            // Mettre à jour les configurations filtrées
+            this.filteredConfigs = [...this.configurations];
+            
+            // Forcer la mise à jour de la vue
+            this.cdr.markForCheck();
+            this.cdr.detectChanges();
+            
+            console.log('Configurations count:', this.configurations.length);
+            console.log('First config:', this.configurations[0]);
+            console.log('Filtered configs count:', this.filteredConfigs.length);
+            console.log('View should be updated now');
+          });
         },
         error: (err) => {
-          console.error('Subscription error:', err);
-          this.configurations = [];
-          this.filteredConfigs = [];
-          this.errorMessage = 'Erreur lors du chargement des données. Vérifiez la console.';
+          this.ngZone.run(() => {
+            console.error('Subscription error:', err);
+            this.configurations = [];
+            this.filteredConfigs = [];
+            this.errorMessage = 'Erreur lors du chargement des données. Vérifiez la console.';
+            this.dataLoaded = true;
+            this.cdr.detectChanges();
+          });
         }
       });
+  }
+
+  /**
+   * Méthode de rafraîchissement forcé qui vide d'abord les données
+   */
+  forceRefresh() {
+    console.log('Force refresh...');
+    
+    // Vider les données existantes
+    this.configurations = [];
+    this.filteredConfigs = [];
+    this.companies = [];
+    this.dataLoaded = false;
+    
+    // Forcer la mise à jour de la vue
+    this.cdr.detectChanges();
+    
+    // Recharger après un court délai
+    setTimeout(() => {
+      this.loadConfigurations();
+      if (this.isSuperAdmin) {
+        this.loadCompanies();
+      }
+    }, 100);
   }
 
   applySearch() {
@@ -241,6 +345,9 @@ export class PayrollConfigComponent implements OnInit {
       c.currency?.toLowerCase().includes(term)
     );
     console.log('Search results:', this.filteredConfigs.length);
+    
+    // Forcer la mise à jour après la recherche
+    this.cdr.detectChanges();
   }
 
   getActiveCount(): number {
@@ -258,6 +365,19 @@ export class PayrollConfigComponent implements OnInit {
   getCompanyName(config: PayrollConfig): string {
     if (!config) return 'N/A';
     return config.company?.name || config.companyId?.substring(0, 8) || 'N/A';
+  }
+
+  getCompanyStatus(config: PayrollConfig): string {
+    if (!config?.company) return 'INACTIVE';
+    return config.company.status || 'INACTIVE';
+  }
+
+  getCompanyDisplayInfo(config: PayrollConfig): { name: string; status: string; isActive: boolean } {
+    const name = this.getCompanyName(config);
+    const status = this.getCompanyStatus(config);
+    const isActive = status === 'ACTIVE';
+    
+    return { name, status, isActive };
   }
 
   formatRegime(regime: string): string {
@@ -289,6 +409,11 @@ export class PayrollConfigComponent implements OnInit {
       notes: '',
     });
     this.showModal = true;
+    
+    // Si Super Admin et entreprises non chargées, les recharger
+    if (this.isSuperAdmin && this.companies.length === 0) {
+      this.loadCompanies();
+    }
   }
 
   editConfig(config: PayrollConfig) {
@@ -385,17 +510,25 @@ export class PayrollConfigComponent implements OnInit {
 
     obs.subscribe({
       next: (response) => {
-        console.log('Save success:', response);
-        this.saving = false;
-        this.successMessage = 'Configuration enregistrée avec succès';
-        this.closeModal();
-        this.loadConfigurations();
-        setTimeout(() => this.successMessage = '', 3000);
+        this.ngZone.run(() => {
+          console.log('Save success:', response);
+          this.saving = false;
+          this.successMessage = 'Configuration enregistrée avec succès';
+          this.closeModal();
+          this.loadConfigurations();
+          setTimeout(() => {
+            this.successMessage = '';
+            this.cdr.detectChanges();
+          }, 3000);
+        });
       },
       error: (err) => {
-        console.error('Save error:', err);
-        this.saving = false;
-        this.errorMessage = err.error?.error || err.message || 'Erreur lors de la sauvegarde';
+        this.ngZone.run(() => {
+          console.error('Save error:', err);
+          this.saving = false;
+          this.errorMessage = err.error?.error || err.message || 'Erreur lors de la sauvegarde';
+          this.cdr.detectChanges();
+        });
       }
     });
   }
@@ -407,23 +540,28 @@ export class PayrollConfigComponent implements OnInit {
     console.log('Deleting config:', id);
     this.http.delete(`${this.apiUrl}/${id}`, { headers: this.authHeaders }).subscribe({
       next: () => {
-        this.successMessage = 'Configuration supprimée avec succès';
-        this.loadConfigurations();
-        setTimeout(() => this.successMessage = '', 3000);
+        this.ngZone.run(() => {
+          this.successMessage = 'Configuration supprimée avec succès';
+          this.loadConfigurations();
+          setTimeout(() => {
+            this.successMessage = '';
+            this.cdr.detectChanges();
+          }, 3000);
+        });
       },
       error: (err) => {
-        console.error('Delete error:', err);
-        this.errorMessage = err.error?.error || 'Erreur lors de la suppression';
+        this.ngZone.run(() => {
+          console.error('Delete error:', err);
+          this.errorMessage = err.error?.error || 'Erreur lors de la suppression';
+          this.cdr.detectChanges();
+        });
       }
     });
   }
 
   refreshData() {
     console.log('Manual refresh...');
-    this.loadConfigurations();
-    if (this.isSuperAdmin) {
-      this.loadCompanies();
-    }
+    this.forceRefresh();
   }
 
   testApiConnection() {
@@ -431,12 +569,16 @@ export class PayrollConfigComponent implements OnInit {
     const url = this.isSuperAdmin ? `${this.apiUrl}/all` : this.apiUrl;
     this.http.get(url, { headers: this.authHeaders }).subscribe({
       next: (data) => {
-        console.log('API Response:', data);
-        alert('API répond correctement ! Données reçues: ' + JSON.stringify(data).substring(0, 200));
+        this.ngZone.run(() => {
+          console.log('API Response:', data);
+          alert('API répond correctement ! Données reçues: ' + JSON.stringify(data).substring(0, 200));
+        });
       },
       error: (err) => {
-        console.error('API Error:', err);
-        alert('Erreur API: ' + err.message + '\nStatus: ' + err.status);
+        this.ngZone.run(() => {
+          console.error('API Error:', err);
+          alert('Erreur API: ' + err.message + '\nStatus: ' + err.status);
+        });
       }
     });
   }
@@ -455,6 +597,7 @@ export class PayrollConfigComponent implements OnInit {
     this.showModal = false;
     this.editingConfig = null;
     this.errorMessage = '';
+    this.cdr.detectChanges();
   }
 
   closeModalOnBackdrop(event: MouseEvent) {
