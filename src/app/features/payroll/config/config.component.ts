@@ -212,15 +212,11 @@ export class PayrollConfigComponent implements OnInit, OnDestroy {
 
   /** Aperçu formule taux horaire (salaire fictif 5000). */
   get hourlyRateExampleLine(): string {
-    const m = Number(this.configForm.get('monthlyHours')?.value);
-    const sup = Number(this.configForm.get('overtimeHoursForRate')?.value) || 0;
     const cur = (this.configForm.get('currency')?.value as string) || 'MAD';
-    if (!Number.isFinite(m) || m < 0) return '';
     const salary = 5000;
-    const r = hourlyRateFromMonthlySalary(salary, m, sup);
+    const r = hourlyRateFromMonthlySalary(salary);
     if (!r) return '';
-    const denom = m + sup;
-    return `Ex. : salaire ${salary} ${cur} → ${r} ${cur}/h (${salary} ÷ ${denom})`;
+    return `Ex. : salaire ${salary} ${cur} → ${r} ${cur}/h (${salary} ÷ 190,67)`;
   }
 
   private getUserCompanyId(): string {

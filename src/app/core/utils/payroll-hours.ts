@@ -10,15 +10,13 @@ export function monthlyHoursFromWeekly(weekly: number = STANDARD_WEEKLY_HOURS): 
   return Number(((w * WEEKS_PER_YEAR) / 12).toFixed(2));
 }
 
-/** Taux horaire : salaire mensuel ÷ (heures mois + heures sup. incluses dans le dénominateur). */
+/** Taux horaire : salaire mensuel ÷ 190,67 (formule légale marocaine). */
 export function hourlyRateFromMonthlySalary(
   monthlySalary: number,
-  monthlyHours: number,
-  overtimeHoursForRate: number = 0
+  _monthlyHours?: number,
+  _overtimeHoursForRate?: number
 ): number {
-  const h = Number(monthlyHours);
-  const sup = Number(overtimeHoursForRate) || 0;
-  const denom = h + sup;
-  if (!Number.isFinite(monthlySalary) || !Number.isFinite(denom) || denom <= 0) return 0;
-  return Number((monthlySalary / denom).toFixed(4));
+  const FIXED_DENOMINATOR = 190.67;
+  if (!Number.isFinite(monthlySalary) || monthlySalary <= 0) return 0;
+  return Number((monthlySalary / FIXED_DENOMINATOR).toFixed(4));
 }
