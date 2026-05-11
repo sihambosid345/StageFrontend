@@ -17,6 +17,9 @@ export class ApiService {
   put<T>(path: string, body: any, options?: any): Observable<any> {
     return this.http.put<any>(`${API_URL}${path}`, body, options);
   }
+  patch<T>(path: string, body: any, options?: any): Observable<any> {
+    return this.http.patch<any>(`${API_URL}${path}`, body, options);
+  }
   delete<T>(path: string, options?: any): Observable<any> {
     return this.http.delete<any>(`${API_URL}${path}`, options);
   }

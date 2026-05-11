@@ -5,7 +5,7 @@ import { Observable } from 'rxjs';
 import {
   Company, Department, Position, Employee, Attendance,
   EmployeeContract, License, PayrollPeriod, PayrollRun,
-  PayrollItem, Payslip, VariableItem, User
+  PayrollItem, Payslip, VariableItem, EmployeeRecurringItem, User
 } from '../models';
 
 // ── Interfaces pour le super admin ──────────────────────────────────────────
@@ -146,6 +146,21 @@ export class VariableItemService {
   create(data: Partial<VariableItem>): Observable<VariableItem>         { return this.api.post('/variable-items', data); }
   update(id: string, data: Partial<VariableItem>): Observable<VariableItem> { return this.api.put(`/variable-items/${id}`, data); }
   delete(id: string): Observable<any>                                   { return this.api.delete(`/variable-items/${id}`); }
+}
+
+@Injectable({ providedIn: 'root' })
+export class RecurringItemService {
+  constructor(private api: ApiService) {}
+  getAll(): Observable<EmployeeRecurringItem[]> { return this.api.get('/recurring-items'); }
+  getById(id: string): Observable<EmployeeRecurringItem> { return this.api.get(`/recurring-items/${id}`); }
+  getByEmployee(employeeId: string): Observable<EmployeeRecurringItem[]> {
+    return this.api.get(`/recurring-items/employee/${employeeId}`);
+  }
+  create(data: Partial<EmployeeRecurringItem>): Observable<EmployeeRecurringItem> { return this.api.post('/recurring-items', data); }
+  update(id: string, data: Partial<EmployeeRecurringItem>): Observable<EmployeeRecurringItem> {
+    return this.api.put(`/recurring-items/${id}`, data);
+  }
+  delete(id: string): Observable<any> { return this.api.delete(`/recurring-items/${id}`); }
 }
 
 @Injectable({ providedIn: 'root' })

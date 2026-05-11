@@ -9,6 +9,7 @@ export interface PayrollConfig {
   currency: string;
   weeklyHours: number | null;
   monthlyHours: number | null;
+  overtimeHoursForRate?: number | null;
   workingDaysPerMonth: number | null;
   cnssEnabled: boolean;
   amoEnabled: boolean;

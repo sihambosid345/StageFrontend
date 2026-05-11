@@ -39,7 +39,7 @@ export class VariableItemsComponent implements OnInit {
 
   form: any = {
     employeeId: '',
-    type: 'ALLOWANCE',
+    type: 'COMMISSION',
     valueType: 'FIXED',
     label: '',
     amount: 0,
@@ -246,7 +246,7 @@ export class VariableItemsComponent implements OnInit {
     const today = new Date().toISOString().slice(0, 10);
     return {
       employeeId: '', 
-      type: 'ALLOWANCE', 
+      type: 'COMMISSION', 
       valueType: 'FIXED',
       label: '', 
       amount: 0,
@@ -354,10 +354,14 @@ export class VariableItemsComponent implements OnInit {
 
   typeClass(t: string): string {
     const m: any = { 
-      ALLOWANCE: 'badge-success', 
-      BONUS: 'badge-info', 
-      DEDUCTION: 'badge-danger', 
-      ADVANCE: 'badge-warning', 
+      COMMISSION: 'badge-info', 
+      FRAIS: 'badge-warning',
+      AVANCE: 'badge-orange',
+      RETENUE: 'badge-danger',
+      PRIME: 'badge-success',
+      DEDUCTION: 'badge-danger',
+      ADVANCE: 'badge-orange',
+      BONUS: 'badge-success',
       OVERTIME: 'badge-purple', 
       OTHER: 'badge-secondary' 
     };

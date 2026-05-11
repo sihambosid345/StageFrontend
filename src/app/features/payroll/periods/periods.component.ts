@@ -5,7 +5,8 @@ import { PayrollPeriodService, CompanyService } from '../../../core/services/dom
 import { AuthService } from '../../../core/services/auth.service';
 import {
   PayrollPeriod, CreatePayrollPeriodPayload, UpdatePayrollPeriodPayload,
-  Company, PAYROLL_PERIOD_STATUS_OPTIONS, FormErrors, validateRequired
+  Company, PAYROLL_PERIOD_STATUS_OPTIONS, PAYROLL_PERIOD_TYPE_OPTIONS,
+  PayrollPeriodType, FormErrors, validateRequired
 } from '../../../core/models';
 
 @Component({
@@ -27,10 +28,11 @@ export class PeriodsComponent implements OnInit {
   errors: FormErrors = {};
 
   readonly statusOptions = PAYROLL_PERIOD_STATUS_OPTIONS;
+  readonly typeOptions = PAYROLL_PERIOD_TYPE_OPTIONS;
 
   form: CreatePayrollPeriodPayload = {
     companyId: '', year: new Date().getFullYear(), month: new Date().getMonth() + 1,
-    startDate: '', endDate: '', status: 'OPEN', isLocked: false,
+    startDate: '', endDate: '', type: 'MONTHLY', status: 'OPEN', isLocked: false,
   };
 
   constructor(
@@ -61,8 +63,17 @@ export class PeriodsComponent implements OnInit {
   onSearch() {
     const q = this.search.toLowerCase();
     this.filtered = this.items.filter(i =>
-      `${i.year} ${i.month} ${i.status}`.toLowerCase().includes(q)
+      `${i.year} ${i.month} ${i.status} ${i.type ?? 'MONTHLY'} ${this.formatPeriodType(i.type)}`.toLowerCase().includes(q)
     );
+  }
+
+  formatPeriodType(t: PayrollPeriodType | undefined | null): string {
+    const map: Record<PayrollPeriodType, string> = {
+      MONTHLY: 'Mensuel',
+      WEEKLY: 'Hebdomadaire',
+      CUSTOM: 'Personnalisé',
+    };
+    return map[t ?? 'MONTHLY'] ?? (t || 'MONTHLY');
   }
 
   get isSuperAdmin(): boolean {
@@ -82,7 +93,7 @@ export class PeriodsComponent implements OnInit {
     this.form = {
       companyId: this.isSuperAdmin ? '' : this.currentCompanyId,
       year: new Date().getFullYear(), month: new Date().getMonth() + 1,
-      startDate: '', endDate: '', status: 'OPEN', isLocked: false, notes: '',
+      startDate: '', endDate: '', type: 'MONTHLY', status: 'OPEN', isLocked: false, notes: '',
     };
     this.editing = false; this.editingId = ''; this.errors = {};
     this.showModal = true;
@@ -92,6 +103,7 @@ export class PeriodsComponent implements OnInit {
     this.form = {
       companyId: item.companyId, year: item.year, month: item.month,
       startDate: item.startDate?.slice(0, 10), endDate: item.endDate?.slice(0, 10),
+      type: item.type ?? 'MONTHLY',
       status: item.status, isLocked: item.isLocked, notes: item.notes ?? '',
     };
     this.editing = true; this.editingId = item.id; this.errors = {};
@@ -102,6 +114,8 @@ export class PeriodsComponent implements OnInit {
     if (!this.isSuperAdmin) {
       this.form.companyId = this.currentCompanyId;
     }
+
+    this.form.type = this.form.type ?? 'MONTHLY';
 
     this.errors = validateRequired(this.form as any, ['companyId', 'year', 'month', 'startDate', 'endDate']);
     if (this.form.month < 1 || this.form.month > 12) this.errors['month'] = 'Mois invalide (1-12)';

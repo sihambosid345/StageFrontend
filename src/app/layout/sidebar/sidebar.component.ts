@@ -43,6 +43,7 @@ export class SidebarComponent {
         { label: 'Présences',          icon: 'bi-calendar-check-fill',       route: '/attendance',     permission: 'attendance' },
         { label: 'Contrats',           icon: 'bi-file-earmark-text-fill',    route: '/contracts',      permission: 'contracts' },
         { label: 'Éléments variables', icon: 'bi-sliders',                   route: '/variable-items', permission: 'contracts' },
+        { label: 'Éléments récurrents', icon: 'bi-arrow-repeat',             route: '/recurring-items', permission: 'payroll' },
       ]
     },
     {

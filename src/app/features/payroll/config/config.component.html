@@ -64,6 +64,7 @@
 
   <!-- Table -->
   <div class="pc-card" *ngIf="!loading">
+    <div class="pc-table-scroll" tabindex="0" role="region" aria-label="Liste des configurations de paie">
     <table class="pc-table">
       <thead>
         <tr>
@@ -72,6 +73,7 @@
           <th>DEVISE</th>
           <th>H/SEMAINE</th>
           <th>H/MOIS</th>
+          <th>HS (taux)</th>
           <th>JOURS/MOIS</th>
           <th>MODULES</th>
           <th>JOURS CNSS</th>
@@ -108,16 +110,19 @@
           <!-- Heures mois -->
           <td class="pc-num">{{ config.monthlyHours !== null ? (config.monthlyHours + 'h') : '—' }}</td>
 
+          <td class="pc-num">{{ config.overtimeHoursForRate != null ? (config.overtimeHoursForRate + 'h') : '—' }}</td>
+
           <!-- Jours mois -->
           <td class="pc-num">{{ config.workingDaysPerMonth !== null ? (config.workingDaysPerMonth + 'j') : '—' }}</td>
 
-          <!-- Modules -->
+          <!-- Modules (uniquement ceux prévus par la licence de l’entreprise) -->
           <td>
             <div class="pc-modules">
-              <span class="pc-module" [class.on]="config.cnssEnabled">CNSS</span>
-              <span class="pc-module" [class.on]="config.amoEnabled">AMO</span>
-              <span class="pc-module" [class.on]="config.irEnabled">IR</span>
-              <span class="pc-module" [class.on]="config.cimrEnabled">CIMR</span>
+              <span *ngIf="tableModulePills(config).length === 0" class="pc-modules__pending">—</span>
+              <span *ngFor="let m of tableModulePills(config)"
+                    class="pc-module"
+                    [class.on]="m.on"
+                    [class.pc-module--scope]="m.licensedOnly">{{ m.label }}</span>
             </div>
           </td>
 
@@ -127,14 +132,20 @@
           <!-- Actions -->
           <td>
             <div class="pc-actions">
-              <button class="pc-action pc-action--edit" (click)="editConfig(config)" title="Modifier">
+              <button type="button" class="pc-action pc-action--details" (click)="openDetails(config)" title="Détails">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <path d="M12 16v-4M12 8h.01"/>
+                </svg>
+              </button>
+              <button type="button" class="pc-action pc-action--edit" (click)="editConfig(config)" title="Modifier">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                   <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                 </svg>
               </button>
               <!-- Bouton Supprimer - visible pour Super Admin -->
-              <button class="pc-action pc-action--delete" (click)="deleteConfig(config.id)"
+              <button type="button" class="pc-action pc-action--delete" (click)="deleteConfig(config.id)"
                       title="Supprimer" *ngIf="isSuperAdmin">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <polyline points="3 6 5 6 21 6"/>
@@ -148,13 +159,14 @@
         </tr>
 
         <tr *ngIf="filteredConfigs.length === 0">
-          <td [attr.colspan]="isSuperAdmin ? 9 : 8" class="pc-empty">
+          <td [attr.colspan]="isSuperAdmin ? 10 : 9" class="pc-empty">
             <div>📋</div>
             <span>Aucune configuration trouvée</span>
           </td>
         </tr>
       </tbody>
     </table>
+    </div>
   </div>
 </div>
 
@@ -230,7 +242,7 @@
         <div class="form-section__title">
           <span class="form-section__dot"></span> Heures & jours de travail
         </div>
-        <div class="form-row form-row--3">
+        <div class="form-row form-row--4">
 
           <div class="form-field" [class.invalid]="isFieldInvalid('weeklyHours')">
             <label class="form-label">Heures / semaine <span class="req">*</span></label>
@@ -247,11 +259,22 @@
             <label class="form-label">Heures / mois <span class="req">*</span></label>
             <div class="form-input-wrap">
               <input class="form-input" type="number" step="0.01" min="0"
-                     formControlName="monthlyHours" placeholder="191.33">
+                     formControlName="monthlyHours" placeholder="190.67">
               <span class="form-unit">h</span>
             </div>
-            <span class="form-hint">Standard : 191.33h</span>
+            <span class="form-hint">Auto : 44×52÷12 ≈ 190,67 h (modifiable)</span>
             <span class="form-error" *ngIf="isFieldInvalid('monthlyHours')">Valeur invalide</span>
+          </div>
+
+          <div class="form-field" [class.invalid]="isFieldInvalid('overtimeHoursForRate')">
+            <label class="form-label">Heures sup. <span class="form-optional">(dénom. taux)</span></label>
+            <div class="form-input-wrap">
+              <input class="form-input" type="number" step="0.01" min="0"
+                     formControlName="overtimeHoursForRate" placeholder="0">
+              <span class="form-unit">h</span>
+            </div>
+            <span class="form-hint">Ajoutées à l’heures/mois pour le taux : salaire ÷ (h/mois + h.sup.)</span>
+            <span class="form-error" *ngIf="isFieldInvalid('overtimeHoursForRate')">≥ 0</span>
           </div>
 
           <div class="form-field" [class.invalid]="isFieldInvalid('workingDaysPerMonth')">
@@ -265,50 +288,46 @@
             <span class="form-error" *ngIf="isFieldInvalid('workingDaysPerMonth')">1 — 31</span>
           </div>
         </div>
+        <p class="form-hint hourly-rate-example" *ngIf="hourlyRateExampleLine">{{ hourlyRateExampleLine }}</p>
       </div>
 
-      <!-- Modules de cotisation -->
+      <!-- Modules activés — identiques à l’écran Licences (lecture seule) -->
       <div class="form-section">
         <div class="form-section__title">
-          <span class="form-section__dot"></span> Modules de cotisation
+          <span class="form-section__dot"></span> Modules activés (licence)
         </div>
-        <div class="form-checkboxes">
+        <p class="form-hint license-modules-hint">
+          Liste calquée sur les interrupteurs <strong>Modules activés</strong> de la licence (Paie, RH, CNSS, Taxes, Damancom, etc.). Non modifiable ici — modifier dans <strong>Licences</strong>.
+        </p>
+        <p class="form-hint license-plan-line" *ngIf="licenseSummaryLine">{{ licenseSummaryLine }}</p>
 
-          <label class="form-check">
-            <input type="checkbox" formControlName="cnssEnabled" class="form-check__input">
-            <span class="form-check__box"></span>
-            <div class="form-check__content">
-              <span class="form-check__label">CNSS</span>
-              <span class="form-check__desc">Caisse Nationale de Sécurité Sociale</span>
-            </div>
-          </label>
+        <div class="license-modules-loading" *ngIf="licenseLoading">
+          <span class="pc-spinner pc-spinner--inline"></span> Chargement de la licence…
+        </div>
 
-          <label class="form-check">
-            <input type="checkbox" formControlName="amoEnabled" class="form-check__input">
-            <span class="form-check__box"></span>
-            <div class="form-check__content">
-              <span class="form-check__label">AMO</span>
-              <span class="form-check__desc">Assurance Maladie Obligatoire</span>
-            </div>
-          </label>
+        <div class="pc-alert pc-alert--error" *ngIf="licenseLoadError && !licenseLoading">
+          <span>✕</span> {{ licenseLoadError }}
+        </div>
 
-          <label class="form-check">
-            <input type="checkbox" formControlName="irEnabled" class="form-check__input">
-            <span class="form-check__box"></span>
-            <div class="form-check__content">
-              <span class="form-check__label">IR</span>
-              <span class="form-check__desc">Impôt sur le Revenu</span>
-            </div>
-          </label>
+        <div class="license-modules-placeholder text-muted" *ngIf="!licenseLoading && !licenseLoadError && !licenseModules && isSuperAdmin && !editingConfig && !companyIdForModal">
+          Sélectionnez une entreprise pour afficher les modules prévus par sa licence.
+        </div>
 
-          <label class="form-check">
-            <input type="checkbox" formControlName="cimrEnabled" class="form-check__input">
-            <span class="form-check__box"></span>
+        <div
+          class="license-modules-empty text-muted"
+          *ngIf="!licenseLoading && !licenseLoadError && licenseModules && licenseModulesFromLicense.length === 0">
+          Aucun module n’est activé sur cette licence. Activez les modules dans l’écran <strong>Licences</strong> (super admin).
+        </div>
+
+        <div class="form-checkboxes license-modules-readonly" *ngIf="licenseModulesFromLicense.length > 0">
+          <div class="form-check form-check--readonly is-on" *ngFor="let m of licenseModulesFromLicense">
+            <span class="form-check__box form-check__box--static checked"></span>
             <div class="form-check__content">
-              <span class="form-check__label">CIMR</span>
-              <span class="form-check__desc">Caisse Interprofessionnelle Marocaine de Retraite</span>
+              <span class="form-check__label">{{ m.label }} <span class="badge-module badge-module--on">Inclus</span></span>
+              <span class="form-check__desc">{{ m.description }}</span>
+              <span class="form-check__code">{{ m.code }}</span>
             </div>
-          </label>
+          </div>
         </div>
       </div>
 
@@ -365,11 +384,182 @@
       </button>
       <button class="pc-btn pc-btn--primary" type="button"
               (click)="saveConfig()"
-              [disabled]="configForm.invalid || saving">
+              [disabled]="configForm.invalid || saving || !canSavePayrollConfig">
         <span *ngIf="!saving">{{ editingConfig ? 'Mettre à jour' : 'Enregistrer' }}</span>
         <span *ngIf="saving" class="btn-spinner"></span>
         <span *ngIf="saving">Enregistrement…</span>
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal détails (lecture seule) -->
+<div class="modal-backdrop modal-backdrop--details" *ngIf="showDetailsModal && detailsConfig"
+     (click)="closeDetailsOnBackdrop($event)">
+  <div class="modal-box modal-box--details" (click)="$event.stopPropagation()">
+    <div class="modal-head">
+      <div class="modal-head__title">
+        <span class="modal-head__icon">ℹ️</span>
+        Détails — {{ getCompanyName(detailsConfig) }}
+      </div>
+      <button type="button" class="modal-head__close" (click)="closeDetails()" aria-label="Fermer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M18 6 6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div class="details-body">
+      <!-- En-tête entreprise -->
+      <div class="det-company-card">
+        <div class="det-company-card__icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/>
+            <path d="M9 21v-4h2v4M9 11h4M10 14h2"/>
+          </svg>
+        </div>
+        <div class="det-company-card__info">
+          <span class="det-company-card__name">{{ getCompanyName(detailsConfig) }}</span>
+          <span class="det-company-card__status" [class.active]="detailsConfig.company?.status === 'ACTIVE'">
+            {{ detailsConfig.company?.status || 'INACTIVE' }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Paramètres de paie -->
+      <div class="det-section">
+        <div class="det-section__title">Paramètres de paie</div>
+        <div class="det-grid">
+          <div class="det-card">
+            <span class="det-card__icon">🏷️</span>
+            <div class="det-card__body">
+              <span class="det-card__label">Régime</span>
+              <span class="det-card__value">{{ formatRegime(detailsConfig.regime) }}</span>
+            </div>
+          </div>
+          <div class="det-card">
+            <span class="det-card__icon">💱</span>
+            <div class="det-card__body">
+              <span class="det-card__label">Devise</span>
+              <span class="det-card__value">{{ detailsConfig.currency }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Heures & jours -->
+      <div class="det-section">
+        <div class="det-section__title">Heures & jours de travail</div>
+        <div class="det-grid det-grid--4">
+          <div class="det-card">
+            <span class="det-card__icon">📅</span>
+            <div class="det-card__body">
+              <span class="det-card__label">Heures / semaine</span>
+              <span class="det-card__value">{{ detailsConfig.weeklyHours ?? '—' }} h</span>
+            </div>
+          </div>
+          <div class="det-card">
+            <span class="det-card__icon">📆</span>
+            <div class="det-card__body">
+              <span class="det-card__label">Heures / mois</span>
+              <span class="det-card__value">{{ detailsConfig.monthlyHours ?? '—' }} h</span>
+            </div>
+          </div>
+          <div class="det-card">
+            <span class="det-card__icon">⏱️</span>
+            <div class="det-card__body">
+              <span class="det-card__label">Heures sup. (taux)</span>
+              <span class="det-card__value">{{ detailsConfig.overtimeHoursForRate != null ? detailsConfig.overtimeHoursForRate + ' h' : '—' }}</span>
+            </div>
+          </div>
+          <div class="det-card">
+            <span class="det-card__icon">📋</span>
+            <div class="det-card__body">
+              <span class="det-card__label">Jours / mois</span>
+              <span class="det-card__value">{{ detailsConfig.workingDaysPerMonth ?? '—' }} j</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Déclaration CNSS & Template -->
+      <div class="det-section">
+        <div class="det-section__title">Déclaration & bulletin</div>
+        <div class="det-grid">
+          <div class="det-card">
+            <span class="det-card__icon">🛡️</span>
+            <div class="det-card__body">
+              <span class="det-card__label">Jours CNSS déclarés</span>
+              <span class="det-card__value">{{ detailsConfig.defaultCnssDeclaredDays ?? '—' }}</span>
+            </div>
+          </div>
+          <div class="det-card">
+            <span class="det-card__icon">📄</span>
+            <div class="det-card__body">
+              <span class="det-card__label">Template bulletin</span>
+              <span class="det-card__value">{{ detailsConfig.payslipTemplate || 'Standard' }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Infos techniques -->
+      <div class="det-section">
+        <div class="det-section__title">Informations</div>
+        <div class="det-grid det-grid--2">
+          <div class="det-card">
+            <span class="det-card__icon">🔢</span>
+            <div class="det-card__body">
+              <span class="det-card__label">Version</span>
+              <span class="det-card__value">{{ detailsConfig.version ?? '—' }}</span>
+            </div>
+          </div>
+          <div class="det-card">
+            <span class="det-card__icon">✓</span>
+            <div class="det-card__body">
+              <span class="det-card__label">Statut</span>
+              <span class="det-card__value">{{ detailsConfig.isActive === false ? 'Inactive' : 'Active' }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="det-info-row">
+          <span class="det-info-row__label">Date d'effet</span>
+          <span class="det-info-row__value">{{ formatDetailDate(detailsConfig.dateEffet) }}</span>
+        </div>
+        <div class="det-info-row">
+          <span class="det-info-row__label">Créée le</span>
+          <span class="det-info-row__value">{{ formatDetailDate(detailsConfig.createdAt) }}</span>
+        </div>
+        <div class="det-info-row">
+          <span class="det-info-row__label">Mise à jour</span>
+          <span class="det-info-row__value">{{ formatDetailDate(detailsConfig.updatedAt) }}</span>
+        </div>
+      </div>
+
+      <div class="details-section-title">Modules sous licence (entreprise)</div>
+      <div class="pc-modules pc-modules--details" *ngIf="detailsConfig">
+        <span *ngIf="tableModulePills(detailsConfig).length === 0" class="pc-modules__pending">Licence non chargée ou aucun module.</span>
+        <span *ngFor="let m of tableModulePills(detailsConfig)"
+              class="pc-module"
+              [class.on]="m.on"
+              [class.pc-module--scope]="m.licensedOnly">{{ m.label }}</span>
+      </div>
+      <p class="details-hint" *ngIf="detailsConfig">Vert = activé dans la config paie (Paie/RH = inclus dans la licence).</p>
+
+      <ng-container *ngIf="licenseForDetails() as lic">
+        <div class="details-section-title">Licence</div>
+        <div class="details-grid">
+          <div class="details-row"><span class="details-k">Plan</span><span class="details-v">{{ lic.planCode || '—' }}</span></div>
+          <div class="details-row"><span class="details-k">Statut</span><span class="details-v">{{ lic.status || '—' }}</span></div>
+          <div class="details-row"><span class="details-k">Fin</span><span class="details-v">{{ formatDetailDate(lic.endsAt ?? undefined) }}</span></div>
+          <div class="details-row details-row--full"><span class="details-k">Régimes disponibles</span><span class="details-v">{{ (lic.availableRegimes || []).join(', ') || '—' }}</span></div>
+        </div>
+      </ng-container>
+
+      <div class="details-section-title">Notes</div>
+      <div class="details-notes">{{ detailsConfig.notes?.trim() ? detailsConfig.notes : '—' }}</div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="pc-btn pc-btn--primary" (click)="closeDetails()">Fermer</button>
     </div>
   </div>
 </div>

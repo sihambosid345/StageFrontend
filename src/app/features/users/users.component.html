@@ -282,7 +282,7 @@
         </div>
       </div>
 
-      <div class="form-group" *ngIf="auth.isSuperAdmin() && form.role && form.role !== 'SUPER_ADMIN'">
+      <div class="form-group" *ngIf="auth.isSuperAdmin() && form.role">
         <label>Entreprise <span class="required">*</span></label>
         <select [(ngModel)]="form.companyId">
           <option value="" disabled>-- Choisir une entreprise --</option>
@@ -292,7 +292,7 @@
         </select>
       </div>
 
-      <div class="form-group" *ngIf="!auth.isSuperAdmin() || form.role === 'SUPER_ADMIN'">
+      <div class="form-group" *ngIf="!auth.isSuperAdmin()">
         <label>Entreprise</label>
         <div class="readonly-field">{{ currentCompanyName }}</div>
       </div>

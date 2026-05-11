@@ -1,0 +1,182 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h2>Éléments récurrents</h2>
+      <div class="text-muted">Transport, ancienneté, indemnité…</div>
+    </div>
+    <div class="actions">
+      <input class="form-control" placeholder="Rechercher..." [(ngModel)]="search" (input)="onSearch()" />
+      <button class="btn btn-primary" (click)="openCreate()">+ Ajouter</button>
+    </div>
+  </div>
+
+  <div *ngIf="loading" class="p-3">Chargement…</div>
+
+  <div *ngIf="!loading" class="card">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th>Employé</th>
+            <th>Type</th>
+            <th>Libellé</th>
+            <th>Montant</th>
+            <th>Début</th>
+            <th>Fin</th>
+            <th>Actif</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of filtered">
+            <td>{{ getEmployeeName(item.employeeId) }}</td>
+            <td><span class="badge bg-secondary">{{ item.type }}</span></td>
+            <td>{{ item.label }}</td>
+            <td>{{ item.amount ?? '—' }}</td>
+            <td>{{ item.effectiveFrom ? (item.effectiveFrom | date: 'yyyy-MM-dd') : '—' }}</td>
+            <td>{{ item.effectiveTo ? (item.effectiveTo | date: 'yyyy-MM-dd') : '—' }}</td>
+            <td>
+              <span class="badge" [ngClass]="item.isActive ? 'bg-success' : 'bg-secondary'">
+                {{ item.isActive ? 'Oui' : 'Non' }}
+              </span>
+            </td>
+            <td class="text-end">
+              <button class="btn btn-sm btn-outline-primary me-2" (click)="openEdit(item)">Modifier</button>
+              <button class="btn btn-sm btn-outline-danger" (click)="delete(item.id)">Supprimer</button>
+            </td>
+          </tr>
+          <tr *ngIf="filtered.length === 0">
+            <td colspan="8" class="text-center text-muted p-3">Aucun élément</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal-backdrop" *ngIf="showModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h5 class="mb-0">{{ editing ? 'Modifier' : 'Ajouter' }} un élément récurrent</h5>
+        <button class="btn btn-sm btn-outline-secondary" (click)="close()">X</button>
+      </div>
+
+      <div class="modal-body">
+        <div *ngIf="error" class="alert alert-danger">{{ error }}</div>
+
+        <div class="form-grid">
+          <!-- Super Admin : entreprise -->
+          <div class="span-2" *ngIf="isSuperAdmin">
+            <label class="form-label">Entreprise <span class="required">*</span></label>
+            <select class="form-select" [(ngModel)]="form.companyId" (ngModelChange)="onCompanyChange()">
+              <option value="">-- sélectionner une entreprise --</option>
+              <option *ngFor="let c of companies" [value]="c.id">{{ c.name }}</option>
+            </select>
+          </div>
+
+          <!-- Département -->
+          <div *ngIf="isSuperAdmin ? form.companyId : true">
+            <label class="form-label">Département</label>
+            <select class="form-select" [(ngModel)]="form.departmentId" (ngModelChange)="onDepartmentChange()"
+              [disabled]="isSuperAdmin && !form.companyId">
+              <option value="">— Tous —</option>
+              <option *ngFor="let d of departments" [value]="d.id">{{ d.name }}</option>
+            </select>
+          </div>
+
+          <!-- Poste -->
+          <div *ngIf="isSuperAdmin ? form.companyId : true">
+            <label class="form-label">Poste</label>
+            <select class="form-select" [(ngModel)]="form.positionId" (ngModelChange)="onPositionChange()"
+              [disabled]="isSuperAdmin && !form.companyId">
+              <option value="">— Tous —</option>
+              <option *ngFor="let p of positions" [value]="p.id">{{ p.name }}</option>
+            </select>
+          </div>
+
+          <!-- Employé -->
+          <div class="span-2">
+            <label class="form-label">Employé <span class="required">*</span></label>
+            <select class="form-select" [(ngModel)]="form.employeeId">
+              <option value="">-- sélectionner un employé --</option>
+              <option *ngFor="let e of filteredEmployees" [value]="e.id">{{ e.firstName }} {{ e.lastName }}</option>
+            </select>
+            <small class="text-muted" *ngIf="isSuperAdmin && !form.companyId">Choisissez d'abord l'entreprise.</small>
+          </div>
+
+          <!-- Type / Valeur -->
+          <div>
+            <label class="form-label">Type <span class="required">*</span></label>
+            <select class="form-select" [(ngModel)]="form.type">
+              <option *ngFor="let t of typeOptions" [value]="t">{{ t }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Type de valeur</label>
+            <select class="form-select" [(ngModel)]="form.valueType">
+              <option value="FIXED">FIXED</option>
+              <option value="PERCENTAGE">PERCENTAGE</option>
+              <option value="SENIORITY_SCALE">SENIORITY_SCALE</option>
+            </select>
+          </div>
+
+          <!-- Libellé -->
+          <div class="span-2">
+            <label class="form-label">Libellé <span class="required">*</span></label>
+            <input class="form-control" [(ngModel)]="form.label" placeholder="Ex: Transport mensuel" />
+          </div>
+
+          <!-- Montant / Pourcentage -->
+          <div *ngIf="form.valueType === 'FIXED'">
+            <label class="form-label">Montant</label>
+            <input type="number" class="form-control" [(ngModel)]="form.amount" placeholder="0.00" step="0.01" />
+          </div>
+          <div *ngIf="form.valueType === 'PERCENTAGE'">
+            <label class="form-label">Pourcentage (%)</label>
+            <input type="number" class="form-control" [(ngModel)]="form.percentageValue" placeholder="0" step="0.01" />
+          </div>
+          <!-- Espace réservé si ni FIXED ni PERCENTAGE (SENIORITY_SCALE) -->
+          <div *ngIf="form.valueType !== 'FIXED' && form.valueType !== 'PERCENTAGE'"></div>
+
+          <!-- Début / Fin -->
+          <div>
+            <label class="form-label">Date début <span class="required">*</span></label>
+            <input type="date" class="form-control" [(ngModel)]="form.effectiveFrom" />
+          </div>
+          <div>
+            <label class="form-label">Date fin</label>
+            <input type="date" class="form-control" [(ngModel)]="form.effectiveTo" />
+          </div>
+
+          <!-- Checkboxes -->
+          <div class="span-2 form-grid three">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="chkActive" [(ngModel)]="form.isActive" />
+              <label class="form-check-label" for="chkActive">Actif</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="chkTaxable" [(ngModel)]="form.isTaxable" />
+              <label class="form-check-label" for="chkTaxable">Imposable</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="chkCnss" [(ngModel)]="form.isCnssApplicable" />
+              <label class="form-check-label" for="chkCnss">CNSS</label>
+            </div>
+          </div>
+
+          <!-- Notes -->
+          <div class="span-2">
+            <label class="form-label">Notes</label>
+            <textarea class="form-control" rows="2" [(ngModel)]="form.notes" placeholder="Remarques éventuelles..."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" (click)="close()">Annuler</button>
+        <button class="btn btn-primary" (click)="save()">Sauvegarder</button>
+      </div>
+    </div>
+  </div>
+</div>
+

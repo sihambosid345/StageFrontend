@@ -18,6 +18,7 @@
       <thead>
         <tr>
           <th>Entreprise</th>
+          <th>Type</th>
           <th>Année</th>
           <th>Mois</th>
           <th>Début</th>
@@ -30,6 +31,7 @@
       <tbody>
         <tr *ngFor="let item of filtered">
           <td>{{ getCompanyName(item.companyId) }}</td>  <!-- ✅ -->
+          <td><span class="badge-type" [attr.title]="item.type || 'MONTHLY'">{{ formatPeriodType(item.type) }}</span></td>
           <td>{{ item.year }}</td>
           <td>{{ item.month }}</td>
           <td>{{ item.startDate | date:'dd/MM/yyyy' }}</td>
@@ -45,7 +47,7 @@
         </tr>
       </tbody>
     </table>
-    <div class="empty-state" *ngIf="filtered.length === 0"><h3>Aucun résultat</h3></div>
+        <div class="empty-state" *ngIf="filtered.length === 0"><h3>Aucun résultat</h3></div>
   </div>
 </div>
 
@@ -71,6 +73,14 @@
           <div class="readonly-field">{{ currentCompanyName }}</div>
         </ng-template>
         <span class="error-text" *ngIf="hasError('companyId')">{{ errors['companyId'] }}</span>
+      </div>
+
+      <div class="form-group">
+        <label>Type de période *</label>
+        <select [(ngModel)]="form.type" name="periodType">
+          <option *ngFor="let t of typeOptions" [ngValue]="t">{{ formatPeriodType(t) }} ({{ t }})</option>
+        </select>
+        <p class="field-hint">MONTHLY = calendrier mensuel · WEEKLY = semaine (7 jours) · CUSTOM = dates libres</p>
       </div>
 
       <div class="form-group">

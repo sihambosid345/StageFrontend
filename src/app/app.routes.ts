@@ -90,6 +90,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/variable-items/variable-items.component').then(m => m.VariableItemsComponent)
       },
       {
+        path: 'recurring-items',
+        canActivate: [permissionGuard('payroll')],
+        loadComponent: () => import('./features/recurring-items/recurring-items.component').then(m => m.RecurringItemsComponent)
+      },
+      {
         path: 'users',
         canActivate: [permissionGuard('users')],
         loadComponent: () => import('./features/users/users.component').then(m => m.UsersComponent)

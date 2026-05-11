@@ -330,9 +330,6 @@ export class UsersComponent implements OnInit {
     if (preset !== undefined) {
       this.form.permissions = [...preset];
     }
-    if (this.form.role === 'SUPER_ADMIN') {
-      this.form.companyId = undefined;
-    }
     this.cdr.detectChanges();
   }
 
@@ -396,11 +393,7 @@ export class UsersComponent implements OnInit {
       payload.companyId = this.auth.currentUser()?.companyId;
     }
 
-    if (this.auth.isSuperAdmin() && this.form.role === 'SUPER_ADMIN') {
-      delete payload.companyId;
-    }
-
-    if (this.auth.isSuperAdmin() && this.form.role !== 'SUPER_ADMIN' && !payload.companyId) {
+    if (this.auth.isSuperAdmin() && !payload.companyId) {
       this.error = 'Le super admin doit choisir une entreprise pour le nouvel utilisateur.';
       this.cdr.detectChanges();
       return;

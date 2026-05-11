@@ -11,7 +11,7 @@ import {
   UserService 
 } from '../../core/services/domain.services';
 import { AuthService } from '../../core/services/auth.service';
-import { CONTRACT_TYPE_OPTIONS, CONTRACT_STATUS_OPTIONS, Company } from '../../core/models';
+import { CONTRACT_TYPE_OPTIONS, CONTRACT_STATUS_OPTIONS, SALARY_CALCULATION_TYPE_OPTIONS, Company } from '../../core/models';
 import { SearchableSelectComponent } from '../../shared/searchable-select.component';
 import { ToastService } from '../../core/services/toast.service';
 
@@ -56,6 +56,7 @@ export class ContractsComponent implements OnInit {
 
   readonly typeOptions = CONTRACT_TYPE_OPTIONS;
   readonly statusOptions = CONTRACT_STATUS_OPTIONS;
+  readonly salaryCalcOptions = SALARY_CALCULATION_TYPE_OPTIONS;
 
   cascade = { companyId: '', departmentId: '', positionId: '' };
   activeContractWarning = '';
@@ -611,6 +612,7 @@ export class ContractsComponent implements OnInit {
   emptyForm() {
     return {
       employeeId: '', contractType: 'CDI', status: 'ACTIVE',
+      salaryCalculationType: 'MONTHLY', baseRate: null,
       startDate: new Date().toISOString().slice(0, 10), endDate: '',
       baseSalary: null, hoursPerMonth: 191, workingDaysPerMonth: 26,
       transportAllowance: null, notes: ''
@@ -670,6 +672,8 @@ export class ContractsComponent implements OnInit {
     this.updateCascadeEmployees();
     this.form = {
       employeeId: item.employeeId, contractType: item.contractType, status: item.status,
+      salaryCalculationType: item.salaryCalculationType || 'MONTHLY',
+      baseRate: item.baseRate ?? null,
       startDate: item.startDate?.slice(0, 10), endDate: item.endDate?.slice(0, 10) ?? '',
       baseSalary: item.baseSalary, hoursPerMonth: item.hoursPerMonth ?? 191,
       workingDaysPerMonth: item.workingDaysPerMonth ?? 26, transportAllowance: item.transportAllowance ?? null, notes: item.notes ?? ''
@@ -799,7 +803,8 @@ export class ContractsComponent implements OnInit {
       if (exist) { this.error = "Cet employé a déjà un contrat actif."; this.cdr.detectChanges(); return; }
     }
     const employee = this.employees.find(e => e.id === this.form.employeeId);
-    const payload: any = { companyId: employee?.companyId ?? this.auth.currentUser()?.companyId, employeeId: this.form.employeeId, contractType: this.form.contractType, status: this.form.status, startDate: this.form.startDate, baseSalary: +this.form.baseSalary };
+    const payload: any = { companyId: employee?.companyId ?? this.auth.currentUser()?.companyId, employeeId: this.form.employeeId, contractType: this.form.contractType, status: this.form.status, salaryCalculationType: this.form.salaryCalculationType || 'MONTHLY', startDate: this.form.startDate, baseSalary: +this.form.baseSalary };
+    if (this.form.baseRate != null && this.form.baseRate !== '') payload.baseRate = +this.form.baseRate;
     if (this.form.endDate) payload.endDate = this.form.endDate;
     if (this.form.hoursPerMonth) payload.hoursPerMonth = +this.form.hoursPerMonth;
     if (this.form.workingDaysPerMonth) payload.workingDaysPerMonth = +this.form.workingDaysPerMonth;

@@ -4,12 +4,37 @@ export type EmployeeStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'LEFT';
 export type Gender = 'MALE' | 'FEMALE';
 export type ContractType = 'CDI' | 'CDD' | 'STAGE' | 'INTERIM' | 'FREELANCE' | 'OTHER';
 export type ContractStatus = 'DRAFT' | 'ACTIVE' | 'ENDED' | 'SUSPENDED' | 'TERMINATED';
+export type SalaryCalculationType = 'MONTHLY' | 'DAILY' | 'HOURLY' | 'MISSION';
 export type PayrollPeriodStatus = 'OPEN' | 'PROCESSING' | 'CLOSED' | 'LOCKED';
+export type PayrollPeriodType = 'MONTHLY' | 'WEEKLY' | 'CUSTOM';
 export type PayrollRunStatus = 'DRAFT' | 'PROCESSING' | 'COMPLETED' | 'CANCELLED';
 export type PayrollItemType = 'BASE_SALARY' | 'ALLOWANCE' | 'BONUS' | 'OVERTIME' | 'DEDUCTION' | 'ADVANCE' | 'TAX' | 'CNSS' | 'OTHER';
-export type VariableItemType = 'ALLOWANCE' | 'BONUS' | 'DEDUCTION' | 'ADVANCE' | 'OVERTIME' | 'OTHER';
+// Aligné avec Prisma (backend)
+export type VariableItemType =
+  | 'COMMISSION'
+  | 'FRAIS'
+  | 'AVANCE'
+  | 'RETENUE'
+  | 'PRIME'
+  | 'ALLOWANCE'
+  | 'BONUS'
+  | 'DEDUCTION'
+  | 'ADVANCE'
+  | 'OVERTIME'
+  | 'OTHER';
 export type VariableValueType = 'FIXED' | 'PERCENTAGE' | 'HOURS' | 'DAYS';
 export type VariableItemStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'APPLIED' | 'CANCELLED';
+// Aligné avec Prisma (backend)
+export type RecurringItemType =
+  | 'TRANSPORT'
+  | 'ANCIENNETE'
+  | 'INDEMNITE'
+  | 'REPRESENTATION'
+  | 'LOGEMENT'
+  | 'TELEPHONE'
+  | 'PANIER'
+  | 'OTHER';
+export type RecurringValueType = 'FIXED' | 'PERCENTAGE' | 'SENIORITY_SCALE';
 export type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'SICK_LEAVE' | 'PAID_LEAVE' | 'UNPAID_LEAVE' | 'HOLIDAY' | 'OTHER';
 export type PayslipStatus = 'DRAFT' | 'GENERATED' | 'SENT' | 'CANCELLED';
 export type LicensePlanCode = 'BASIC' | 'PRO' | 'BUSINESS' | 'ENTERPRISE';
@@ -22,7 +47,7 @@ export type BillingCycle = 'MONTHLY' | 'YEARLY' | 'LIFETIME';
 
 // ─── PayrollConfig (Configuration de paie) ───────────────────────────────────
 
-export type PayrollRegime = 'MOROCCO_STANDARD';
+export type PayrollRegime = 'MOROCCO_STANDARD' | 'MAROC_TRANSPORT' | 'MOROCCO_OFFSHORE' | 'MOROCCO_AGRICULTURAL';
 
 export interface PayrollConfig {
   id: string;
@@ -32,14 +57,21 @@ export interface PayrollConfig {
   currency: string;
   weeklyHours: number | null;
   monthlyHours: number | null;
+  overtimeHoursForRate?: number | null;
   workingDaysPerMonth: number | null;
   cnssEnabled: boolean;
   amoEnabled: boolean;
   irEnabled: boolean;
   cimrEnabled: boolean;
+  damancomEnabled?: boolean;
   defaultCnssDeclaredDays: number | null;
   payslipTemplate?: string | null;
   notes?: string | null;
+  dateEffet: string;
+  isActive: boolean;
+  version: number;
+  createdById?: string | null;
+  createdBy?: Pick<User, 'id' | 'firstName' | 'lastName'> | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -50,20 +82,26 @@ export interface CreatePayrollConfigPayload {
   currency?: string;
   weeklyHours?: number;
   monthlyHours?: number;
+  overtimeHoursForRate?: number | null;
   workingDaysPerMonth?: number;
   cnssEnabled?: boolean;
   amoEnabled?: boolean;
   irEnabled?: boolean;
   cimrEnabled?: boolean;
+  damancomEnabled?: boolean;
   defaultCnssDeclaredDays?: number;
   payslipTemplate?: string;
   notes?: string;
+  dateEffet: string;
+  isActive?: boolean;
+  version?: number;
+  createdById?: string;
 }
 
 export type UpdatePayrollConfigPayload = Partial<Omit<CreatePayrollConfigPayload, 'companyId'>>;
 
 // Liste des options pour les dropdowns
-export const PAYROLL_REGIME_OPTIONS: PayrollRegime[] = ['MOROCCO_STANDARD'];
+export const PAYROLL_REGIME_OPTIONS: PayrollRegime[] = ['MOROCCO_STANDARD', 'MAROC_TRANSPORT', 'MOROCCO_OFFSHORE', 'MOROCCO_AGRICULTURAL'];
 export const CURRENCY_OPTIONS: string[] = ['MAD', 'EUR', 'USD', 'GBP'];
 
 // ─── Enum lists for dropdowns ─────────────────────────────────────────────────
@@ -74,12 +112,36 @@ export const EMPLOYEE_STATUS_OPTIONS: EmployeeStatus[] = ['ACTIVE', 'INACTIVE', 
 export const GENDER_OPTIONS: Gender[] = ['MALE', 'FEMALE'];
 export const CONTRACT_TYPE_OPTIONS: ContractType[] = ['CDI', 'CDD', 'STAGE', 'INTERIM', 'FREELANCE', 'OTHER'];
 export const CONTRACT_STATUS_OPTIONS: ContractStatus[] = ['DRAFT', 'ACTIVE', 'ENDED', 'SUSPENDED', 'TERMINATED'];
+export const SALARY_CALCULATION_TYPE_OPTIONS: SalaryCalculationType[] = ['MONTHLY', 'DAILY', 'HOURLY', 'MISSION'];
+export const PAYROLL_PERIOD_TYPE_OPTIONS: PayrollPeriodType[] = ['MONTHLY', 'WEEKLY', 'CUSTOM'];
 export const PAYROLL_PERIOD_STATUS_OPTIONS: PayrollPeriodStatus[] = ['OPEN', 'PROCESSING', 'CLOSED', 'LOCKED'];
 export const PAYROLL_RUN_STATUS_OPTIONS: PayrollRunStatus[] = ['DRAFT', 'PROCESSING', 'COMPLETED', 'CANCELLED'];
 export const PAYROLL_ITEM_TYPE_OPTIONS: PayrollItemType[] = ['BASE_SALARY', 'ALLOWANCE', 'BONUS', 'OVERTIME', 'DEDUCTION', 'ADVANCE', 'TAX', 'CNSS', 'OTHER'];
-export const VARIABLE_ITEM_TYPE_OPTIONS: VariableItemType[] = ['ALLOWANCE', 'BONUS', 'DEDUCTION', 'ADVANCE', 'OVERTIME', 'OTHER'];
+export const VARIABLE_ITEM_TYPE_OPTIONS: VariableItemType[] = [
+  'COMMISSION',
+  'FRAIS',
+  'AVANCE',
+  'RETENUE',
+  'PRIME',
+  'ALLOWANCE',
+  'BONUS',
+  'DEDUCTION',
+  'ADVANCE',
+  'OVERTIME',
+  'OTHER',
+];
 export const VARIABLE_VALUE_TYPE_OPTIONS: VariableValueType[] = ['FIXED', 'PERCENTAGE', 'HOURS', 'DAYS'];
 export const VARIABLE_ITEM_STATUS_OPTIONS: VariableItemStatus[] = ['PENDING', 'APPROVED', 'REJECTED', 'APPLIED', 'CANCELLED'];
+export const RECURRING_ITEM_TYPE_OPTIONS: RecurringItemType[] = [
+  'TRANSPORT',
+  'ANCIENNETE',
+  'INDEMNITE',
+  'REPRESENTATION',
+  'LOGEMENT',
+  'TELEPHONE',
+  'PANIER',
+  'OTHER',
+];
 export const ATTENDANCE_STATUS_OPTIONS: AttendanceStatus[] = ['PRESENT', 'ABSENT', 'SICK_LEAVE', 'PAID_LEAVE', 'UNPAID_LEAVE', 'HOLIDAY', 'OTHER'];
 export const PAYSLIP_STATUS_OPTIONS: PayslipStatus[] = ['DRAFT', 'GENERATED', 'SENT', 'CANCELLED'];
 export const LICENSE_PLAN_OPTIONS: LicensePlanCode[] = ['BASIC', 'PRO', 'BUSINESS', 'ENTERPRISE'];
@@ -284,6 +346,8 @@ export interface EmployeeContract {
   startDate: string;
   endDate?: string | null;
   baseSalary: number;
+  baseRate?: number | null;
+  salaryCalculationType?: SalaryCalculationType | null;
   hoursPerMonth?: number | null;
   workingDaysPerMonth?: number | null;
   notes?: string | null;
@@ -296,6 +360,8 @@ export interface CreateContractPayload {
   contractType: ContractType;
   startDate: string;
   baseSalary: number;
+  baseRate?: number;
+  salaryCalculationType?: SalaryCalculationType;
   status?: ContractStatus;
   endDate?: string;
   hoursPerMonth?: number;
@@ -312,6 +378,7 @@ export interface PayrollPeriod {
   month: number;
   startDate: string;
   endDate: string;
+  type: PayrollPeriodType;
   status: PayrollPeriodStatus;
   isLocked: boolean;
   notes?: string | null;
@@ -326,6 +393,7 @@ export interface CreatePayrollPeriodPayload {
   month: number;
   startDate: string;
   endDate: string;
+  type?: PayrollPeriodType;
   status?: PayrollPeriodStatus;
   isLocked?: boolean;
   notes?: string;
@@ -444,6 +512,51 @@ export interface CreateVariableItemPayload {
 }
 export type UpdateVariableItemPayload = Partial<Omit<CreateVariableItemPayload, 'companyId' | 'employeeId'>>;
 
+export interface EmployeeRecurringItem {
+  id: string;
+  companyId: string;
+  company?: Pick<Company, 'id' | 'name'>;
+  employeeId: string;
+  employee?: Pick<Employee, 'id' | 'firstName' | 'lastName'>;
+  type: RecurringItemType;
+  valueType: RecurringValueType;
+  code?: string | null;
+  label: string;
+  amount?: number | null;
+  percentageValue?: number | null;
+  seniorityRules?: Record<string, unknown> | null;
+  effectiveFrom: string;
+  effectiveTo?: string | null;
+  isActive: boolean;
+  isCnssApplicable: boolean;
+  isTaxable: boolean;
+  notes?: string | null;
+  createdById?: string | null;
+  createdBy?: Pick<User, 'id' | 'firstName' | 'lastName'> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateEmployeeRecurringItemPayload {
+  companyId: string;
+  employeeId: string;
+  type: RecurringItemType;
+  label: string;
+  valueType?: RecurringValueType;
+  amount?: number;
+  percentageValue?: number;
+  seniorityRules?: Record<string, unknown>;
+  isTaxable?: boolean;
+  isCnssApplicable?: boolean;
+  isActive?: boolean;
+  effectiveFrom: string;
+  effectiveTo?: string;
+  notes?: string;
+  createdById?: string;
+}
+
+export type UpdateEmployeeRecurringItemPayload = Partial<Omit<CreateEmployeeRecurringItemPayload, 'companyId' | 'employeeId'>>;
+
 export interface AttendanceRecord {
   id: string;
   companyId: string;
@@ -531,6 +644,8 @@ export interface License {
   cnssEnabled: boolean;
   taxEnabled: boolean;
   damancomEnabled: boolean;
+  cimrEnabled?: boolean;
+  availableRegimes?: string[];
   startsAt: string;
   endsAt?: string | null;
   lastRenewedAt?: string | null;
