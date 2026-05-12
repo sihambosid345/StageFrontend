@@ -38,3 +38,146 @@
   color: #64748b;
   line-height: 1.35;
 }
+/* ─── Bandeau période OPEN ───────────────────────────────────────────── */
+.open-period-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+  border: 1px solid #6ee7b7;
+  border-radius: 10px;
+  padding: 12px 20px;
+  margin-bottom: 20px;
+  gap: 12px;
+
+  .open-period-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    color: #065f46;
+
+    .period-dates {
+      color: #047857;
+      font-size: 12px;
+    }
+  }
+
+  .open-dot { font-size: 11px; }
+}
+
+/* ─── Bannières info / erreur ────────────────────────────────────────── */
+.error-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  color: #dc2626;
+  font-size: 13.5px;
+  line-height: 1.5;
+
+  i { flex-shrink: 0; margin-top: 2px; }
+}
+
+.info-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  color: #1d4ed8;
+  font-size: 13px;
+  line-height: 1.5;
+
+  &.mt-2 { margin-top: 12px; }
+  i { flex-shrink: 0; margin-top: 2px; }
+}
+
+/* ─── Table row OPEN ─────────────────────────────────────────────────── */
+.row-open {
+  background: rgba(16, 185, 129, 0.05);
+}
+
+.period-label-cell { font-size: 14px; }
+
+/* ─── Badges ─────────────────────────────────────────────────────────── */
+.badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+.badge-success   { background: #d1fae5; color: #065f46; }
+.badge-warning   { background: #fef3c7; color: #92400e; }
+.badge-secondary { background: #f3f4f6; color: #6b7280; }
+.badge-danger    { background: #fee2e2; color: #991b1b; }
+.badge-type      { background: #e0e7ff; color: #3730a3; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+
+/* ─── Modal de confirmation ──────────────────────────────────────────── */
+.modal-confirm {
+  max-width: 480px !important;
+  width: 480px !important;
+}
+
+.confirm-icon { font-size: 40px; text-align: center; margin-bottom: 12px; }
+
+.confirm-title {
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 8px;
+  color: var(--text-primary, #111);
+}
+
+.confirm-desc {
+  font-size: 14px;
+  color: var(--text-secondary, #555);
+  text-align: center;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+
+/* ─── Résultat clôture ───────────────────────────────────────────────── */
+.result-grid {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.result-card {
+  border-radius: 10px;
+  padding: 14px 18px;
+  text-align: center;
+  min-width: 130px;
+
+  &.result-closed { background: #f3f4f6; border: 1px solid #d1d5db; }
+  &.result-opened { background: #d1fae5; border: 1px solid #6ee7b7; }
+
+  .result-label  { font-size: 11px; font-weight: 600; text-transform: uppercase; color: #9ca3af; margin-bottom: 6px; }
+  .result-period { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+}
+
+.result-arrow { font-size: 20px; color: #6b7280; }
+
+/* ─── Spinner petit ──────────────────────────────────────────────────── */
+.spinner-sm {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255,255,255,0.4);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  vertical-align: middle;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── Divers ─────────────────────────────────────────────────────────── */
+.readonly-field { background: var(--bg-secondary, #f9fafb); border-radius: 6px; padding: 8px 12px; font-size: 14px; color: var(--text-secondary, #555); }
+.optional       { font-size: 12px; color: var(--text-muted, #9ca3af); font-weight: 400; }
+.btn-sm         { padding: 6px 14px; font-size: 13px; }

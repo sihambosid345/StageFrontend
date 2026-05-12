@@ -9,19 +9,22 @@ export type PayrollPeriodStatus = 'OPEN' | 'PROCESSING' | 'CLOSED' | 'LOCKED';
 export type PayrollPeriodType = 'MONTHLY' | 'WEEKLY' | 'CUSTOM';
 export type PayrollRunStatus = 'DRAFT' | 'PROCESSING' | 'COMPLETED' | 'CANCELLED';
 export type PayrollItemType = 'BASE_SALARY' | 'ALLOWANCE' | 'BONUS' | 'OVERTIME' | 'DEDUCTION' | 'ADVANCE' | 'TAX' | 'CNSS' | 'OTHER';
-// Aligné avec Prisma (backend)
+// Types variable métier (aligné avec Prisma backend)
 export type VariableItemType =
   | 'COMMISSION'
   | 'FRAIS'
   | 'AVANCE'
   | 'RETENUE'
-  | 'PRIME'
-  | 'ALLOWANCE'
-  | 'BONUS'
-  | 'DEDUCTION'
-  | 'ADVANCE'
-  | 'OVERTIME'
-  | 'OTHER';
+  | 'PRIME';
+
+/** Labels français pour l'affichage */
+export const VARIABLE_ITEM_TYPE_LABELS: Record<VariableItemType, string> = {
+  COMMISSION: 'Commission',
+  FRAIS:      'Frais',
+  AVANCE:     'Avance',
+  RETENUE:    'Retenue',
+  PRIME:      'Prime',
+};
 export type VariableValueType = 'FIXED' | 'PERCENTAGE' | 'HOURS' | 'DAYS';
 export type VariableItemStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'APPLIED' | 'CANCELLED';
 // Aligné avec Prisma (backend)
@@ -123,12 +126,6 @@ export const VARIABLE_ITEM_TYPE_OPTIONS: VariableItemType[] = [
   'AVANCE',
   'RETENUE',
   'PRIME',
-  'ALLOWANCE',
-  'BONUS',
-  'DEDUCTION',
-  'ADVANCE',
-  'OVERTIME',
-  'OTHER',
 ];
 export const VARIABLE_VALUE_TYPE_OPTIONS: VariableValueType[] = ['FIXED', 'PERCENTAGE', 'HOURS', 'DAYS'];
 export const VARIABLE_ITEM_STATUS_OPTIONS: VariableItemStatus[] = ['PENDING', 'APPROVED', 'REJECTED', 'APPLIED', 'CANCELLED'];

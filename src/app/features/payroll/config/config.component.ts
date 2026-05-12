@@ -210,13 +210,19 @@ export class PayrollConfigComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  /** Aperçu formule taux horaire (salaire fictif 5000). */
+  /** Aperçu formule taux horaire : salaire ÷ heures travaillées par mois. */
   get hourlyRateExampleLine(): string {
     const cur = (this.configForm.get('currency')?.value as string) || 'MAD';
     const salary = 5000;
-    const r = hourlyRateFromMonthlySalary(salary);
+    const monthlyH: number = Number(this.configForm.get('monthlyHours')?.value) || 190.67;
+    const overtimeH: number = Number(this.configForm.get('overtimeHoursForRate')?.value) || 0;
+    const denominator = monthlyH + overtimeH;
+    const r = hourlyRateFromMonthlySalary(salary, monthlyH, overtimeH);
     if (!r) return '';
-    return `Ex. : salaire ${salary} ${cur} → ${r} ${cur}/h (${salary} ÷ 190,67)`;
+    const denominatorLabel = overtimeH > 0
+      ? `${monthlyH} + ${overtimeH} = ${denominator.toFixed(2)}`
+      : `${denominator.toFixed(2)}`;
+    return `Ex. : salaire ${salary} ${cur} ÷ ${denominatorLabel} h = ${r} ${cur}/h`;
   }
 
   private getUserCompanyId(): string {

@@ -1,12 +1,39 @@
+<!-- ═══════════════════════ HEADER ═══════════════════════ -->
 <div class="page-header">
-  <div><h1>Périodes de paie</h1><p class="page-subtitle">Gestion des périodes de paie</p></div>
-  <button class="btn btn-primary" (click)="openCreate()">+ Ajouter</button>
+  <div>
+    <h1>Périodes de paie</h1>
+    <p class="page-subtitle">Gestion des périodes de paie — une seule période OUVERTE à la fois</p>
+  </div>
+  <button class="btn btn-primary" (click)="checkAndOpenCreate()">
+    <i class="bi bi-plus-lg"></i> Nouvelle période
+  </button>
 </div>
 
+<!-- ═══════════════════════ BANDEAU PÉRIODE OPEN ═══════════════════════ -->
+<div class="open-period-banner" *ngIf="!isSuperAdmin && openPeriod">
+  <div class="open-period-info">
+    <span class="badge badge-success open-dot">OUVERTE</span>
+    <strong>{{ monthLabel(openPeriod.month) }} {{ openPeriod.year }}</strong>
+    <span class="period-dates">
+      {{ openPeriod.startDate | date:'dd/MM/yyyy' }} → {{ openPeriod.endDate | date:'dd/MM/yyyy' }}
+    </span>
+  </div>
+  <button class="btn btn-warning btn-sm" (click)="openCloseModal(openPeriod)">
+    <i class="bi bi-lock-fill"></i> Clôturer et ouvrir la suivante
+  </button>
+</div>
+
+<!-- ═══════════════════════ TABLE ═══════════════════════ -->
 <div class="table-container">
   <div class="table-toolbar">
-    <h2>Périodes de paie</h2>
+    <div class="toolbar-heading">
+      <h2>Périodes de paie</h2>
+      <p class="toolbar-subtitle">{{ filtered.length }} période(s)</p>
+    </div>
     <div class="search-input">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
       <input type="text" placeholder="Rechercher..." [(ngModel)]="search" (input)="onSearch()" />
     </div>
   </div>
@@ -17,10 +44,9 @@
     <table *ngIf="filtered.length > 0">
       <thead>
         <tr>
-          <th>Entreprise</th>
+          <th *ngIf="isSuperAdmin">Entreprise</th>
+          <th>Période</th>
           <th>Type</th>
-          <th>Année</th>
-          <th>Mois</th>
           <th>Début</th>
           <th>Fin</th>
           <th>Statut</th>
@@ -29,121 +55,202 @@
         </tr>
       </thead>
       <tbody>
-        <tr *ngFor="let item of filtered">
-          <td>{{ getCompanyName(item.companyId) }}</td>  <!-- ✅ -->
-          <td><span class="badge-type" [attr.title]="item.type || 'MONTHLY'">{{ formatPeriodType(item.type) }}</span></td>
-          <td>{{ item.year }}</td>
-          <td>{{ item.month }}</td>
+        <tr *ngFor="let item of filtered" [class.row-open]="item.status === 'OPEN'">
+          <td *ngIf="isSuperAdmin">{{ getCompanyName(item.companyId) }}</td>
+          <td class="period-label-cell">
+            <strong>{{ monthLabel(item.month) }} {{ item.year }}</strong>
+          </td>
+          <td>
+            <span class="badge-type">{{ formatPeriodType(item.type) }}</span>
+          </td>
           <td>{{ item.startDate | date:'dd/MM/yyyy' }}</td>
           <td>{{ item.endDate | date:'dd/MM/yyyy' }}</td>
-          <td>{{ item.status }}</td>
-          <td>{{ item.isLocked ? 'Oui' : 'Non' }}</td>
+          <td>
+            <span class="badge" [ngClass]="statusClass(item.status)">{{ item.status }}</span>
+          </td>
+          <td>
+            <span class="lock-icon" [title]="item.isLocked ? 'Verrouillée' : 'Non verrouillée'">
+              {{ item.isLocked ? '🔒' : '—' }}
+            </span>
+          </td>
           <td>
             <div class="actions">
-              <button class="btn btn-icon btn-secondary" (click)="openEdit(item)" title="Modifier">✏️</button>
-              <button class="btn btn-icon btn-danger" (click)="delete(item.id)" title="Supprimer">🗑️</button>
+              <button
+                class="btn btn-icon btn-warning"
+                *ngIf="item.status === 'OPEN'"
+                (click)="openCloseModal(item)"
+                title="Clôturer cette période"
+              >
+                <i class="bi bi-lock-fill"></i>
+              </button>
+              <button
+                class="btn btn-icon btn-danger"
+                (click)="delete(item)"
+                title="{{ item.status === 'OPEN' ? 'Impossible : période OPEN' : 'Supprimer' }}"
+                [disabled]="item.status === 'OPEN'"
+              >
+                <i class="bi bi-trash"></i>
+              </button>
             </div>
           </td>
         </tr>
       </tbody>
     </table>
-        <div class="empty-state" *ngIf="filtered.length === 0"><h3>Aucun résultat</h3></div>
+    <div class="empty-state" *ngIf="filtered.length === 0">
+      <i class="bi bi-calendar-x" style="font-size:40px;color:var(--text-muted);"></i>
+      <h3>Aucune période de paie</h3>
+      <p>Créez la première période pour commencer.</p>
+    </div>
   </div>
 </div>
 
+<!-- ═══════════════════════ MODAL CRÉATION ═══════════════════════ -->
 <div class="modal-overlay" *ngIf="showModal" (click)="close()">
   <div class="modal" (click)="$event.stopPropagation()">
     <div class="modal-header">
-      <h3>{{ editing ? 'Modifier' : 'Ajouter' }} – Période de paie</h3>
-      <button class="btn btn-icon btn-secondary" (click)="close()">✕</button>
+      <h3><i class="bi bi-calendar-plus" style="color:var(--accent);"></i> Nouvelle période de paie</h3>
+      <button class="btn btn-icon btn-secondary" (click)="close()"><i class="bi bi-x-lg"></i></button>
     </div>
+
     <div class="modal-body">
-      <div class="error-msg" *ngIf="errors['api']">{{ errors["api"] }}</div>
 
-      <!-- ✅ Select Entreprise -->
-      <div class="form-group">
-        <label>Entreprise *</label>
-        <ng-container *ngIf="isSuperAdmin; else fixedCompany">
-          <select [(ngModel)]="form.companyId" [class.error]="hasError('companyId')">
-            <option value="">-- Sélectionner --</option>
-            <option *ngFor="let c of companies" [value]="c.id">{{ c.name }}</option>
+      <!-- Erreur API -->
+      <div class="error-banner" *ngIf="apiError">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        <span>{{ apiError }}</span>
+      </div>
+
+      <!-- Règle métier expliquée -->
+      <div class="info-banner">
+        <i class="bi bi-info-circle-fill"></i>
+        <span>Une seule période peut être <strong>OUVERTE</strong> par entreprise.
+        La période suivante sera créée automatiquement en statut <em>FERMÉE</em>, prête à être ouverte.</span>
+      </div>
+
+      <!-- Entreprise (superadmin seulement) -->
+      <div class="form-group" *ngIf="isSuperAdmin">
+        <label>Entreprise <span class="req">*</span></label>
+        <select [(ngModel)]="form.companyId" (change)="onFormCompanyChange()">
+          <option value="">-- Sélectionner une entreprise --</option>
+          <option *ngFor="let c of companies" [value]="c.id">{{ c.name }}</option>
+        </select>
+      </div>
+      <div class="form-group" *ngIf="!isSuperAdmin">
+        <label>Entreprise</label>
+        <div class="readonly-field"><i class="bi bi-building"></i> {{ currentCompanyName }}</div>
+      </div>
+
+      <div class="form-grid-2">
+        <!-- Année -->
+        <div class="form-group">
+          <label>Année <span class="req">*</span></label>
+          <select [(ngModel)]="form.year">
+            <option *ngFor="let y of years" [value]="y">{{ y }}</option>
           </select>
-        </ng-container>
-        <ng-template #fixedCompany>
-          <div class="readonly-field">{{ currentCompanyName }}</div>
-        </ng-template>
-        <span class="error-text" *ngIf="hasError('companyId')">{{ errors['companyId'] }}</span>
+        </div>
+
+        <!-- Mois -->
+        <div class="form-group">
+          <label>Mois <span class="req">*</span></label>
+          <select [(ngModel)]="form.month">
+            <option *ngFor="let m of monthNames; let i = index" [value]="i + 1">{{ m }}</option>
+          </select>
+        </div>
       </div>
 
+      <!-- Type -->
       <div class="form-group">
-        <label>Type de période *</label>
-        <select [(ngModel)]="form.type" name="periodType">
-          <option *ngFor="let t of typeOptions" [ngValue]="t">{{ formatPeriodType(t) }} ({{ t }})</option>
+        <label>Type de période</label>
+        <select [(ngModel)]="form.type">
+          <option *ngFor="let t of typeOptions" [value]="t">{{ formatPeriodType(t) }}</option>
         </select>
-        <p class="field-hint">MONTHLY = calendrier mensuel · WEEKLY = semaine (7 jours) · CUSTOM = dates libres</p>
+        <p class="field-hint">Les dates de début/fin sont calculées automatiquement selon le type.</p>
       </div>
 
+      <!-- Notes -->
       <div class="form-group">
-        <label>Année *</label>
-        <input type="number" [(ngModel)]="form.year" [class.error]="hasError('year')" />
-        <span class="error-text" *ngIf="hasError('year')">{{ errors['year'] }}</span>
-      </div>
-
-      <div class="form-group">
-        <label>Mois *</label>
-        <select [(ngModel)]="form.month" [class.error]="hasError('month')">
-          <option [value]="1">Janvier</option>
-          <option [value]="2">Février</option>
-          <option [value]="3">Mars</option>
-          <option [value]="4">Avril</option>
-          <option [value]="5">Mai</option>
-          <option [value]="6">Juin</option>
-          <option [value]="7">Juillet</option>
-          <option [value]="8">Août</option>
-          <option [value]="9">Septembre</option>
-          <option [value]="10">Octobre</option>
-          <option [value]="11">Novembre</option>
-          <option [value]="12">Décembre</option>
-        </select>
-        <span class="error-text" *ngIf="hasError('month')">{{ errors['month'] }}</span>
-      </div>
-
-      <div class="form-group">
-        <label>Date début *</label>
-        <input type="date" [(ngModel)]="form.startDate" [class.error]="hasError('startDate')" />
-        <span class="error-text" *ngIf="hasError('startDate')">{{ errors['startDate'] }}</span>
-      </div>
-
-      <div class="form-group">
-        <label>Date fin *</label>
-        <input type="date" [(ngModel)]="form.endDate" [class.error]="hasError('endDate')" />
-        <span class="error-text" *ngIf="hasError('endDate')">{{ errors['endDate'] }}</span>
-      </div>
-
-      <div class="form-group">
-        <label>Statut</label>
-        <select [(ngModel)]="form.status">
-          <option *ngFor="let s of statusOptions" [value]="s">{{ s }}</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label>Verrouillé</label>
-        <select [(ngModel)]="form.isLocked">
-          <option [ngValue]="false">Non</option>
-          <option [ngValue]="true">Oui</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label>Notes</label>
-        <input type="text" [(ngModel)]="form.notes" />
+        <label>Notes <span class="optional">(optionnel)</span></label>
+        <input type="text" [(ngModel)]="form.notes" placeholder="Remarques..." />
       </div>
     </div>
 
     <div class="modal-footer">
-      <button class="btn btn-secondary" (click)="close()">Annuler</button>
-      <button class="btn btn-primary" (click)="save()">{{ editing ? 'Enregistrer' : 'Créer' }}</button>
+      <button class="btn btn-secondary" (click)="close()" [disabled]="saving">
+        <i class="bi bi-x-circle"></i> Annuler
+      </button>
+      <button class="btn btn-primary" (click)="save()" [disabled]="saving || !!apiError">
+        <span *ngIf="saving" class="spinner-sm"></span>
+        <i class="bi bi-check-circle-fill" *ngIf="!saving"></i>
+        {{ saving ? 'Création...' : 'Créer la période' }}
+      </button>
     </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ MODAL CLÔTURE ═══════════════════════ -->
+<div class="modal-overlay" *ngIf="showCloseModal" (click)="closeModal()">
+  <div class="modal modal-confirm" (click)="$event.stopPropagation()">
+
+    <!-- Avant clôture -->
+    <ng-container *ngIf="!closeResult">
+      <div class="modal-header">
+        <h3><i class="bi bi-lock-fill" style="color:var(--warning);"></i> Clôturer la période</h3>
+        <button class="btn btn-icon btn-secondary" (click)="closeModal()"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="confirm-icon">🔒</div>
+        <p class="confirm-title">
+          Clôturer <strong>{{ monthLabel(closingPeriod?.month ?? 1) }} {{ closingPeriod?.year }}</strong> ?
+        </p>
+        <p class="confirm-desc">
+          Cette période passera en statut <span class="badge badge-secondary">CLOSED</span>.
+          La période suivante sera <strong>ouverte automatiquement</strong>.
+        </p>
+        <div class="info-banner mt-2">
+          <i class="bi bi-arrow-right-circle-fill"></i>
+          <span>
+            La période <strong>{{ nextPeriodLabel(closingPeriod) }}</strong> sera ouverte automatiquement.
+          </span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeModal()" [disabled]="closing">Annuler</button>
+        <button class="btn btn-warning" (click)="confirmClose()" [disabled]="closing">
+          <span *ngIf="closing" class="spinner-sm"></span>
+          <i class="bi bi-lock-fill" *ngIf="!closing"></i>
+          {{ closing ? 'Clôture...' : 'Confirmer la clôture' }}
+        </button>
+      </div>
+    </ng-container>
+
+    <!-- Résultat clôture -->
+    <ng-container *ngIf="closeResult">
+      <div class="modal-header">
+        <h3><i class="bi bi-check-circle-fill" style="color:var(--success);"></i> Clôture effectuée</h3>
+        <button class="btn btn-icon btn-secondary" (click)="closeModal()"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div class="modal-body">
+        <p class="confirm-desc">{{ closeResult.message }}</p>
+        <div class="result-grid">
+          <div class="result-card result-closed">
+            <div class="result-label">Clôturée</div>
+            <div class="result-period">{{ monthLabel(closeResult.closed.month) }} {{ closeResult.closed.year }}</div>
+            <span class="badge badge-secondary">CLOSED</span>
+          </div>
+          <div class="result-arrow"><i class="bi bi-arrow-right"></i></div>
+          <div class="result-card result-opened" *ngIf="closeResult.opened">
+            <div class="result-label">Ouverte</div>
+            <div class="result-period">{{ monthLabel(closeResult.opened.month) }} {{ closeResult.opened.year }}</div>
+            <span class="badge badge-success">OPEN</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" (click)="closeModal()">
+          <i class="bi bi-check"></i> Fermer
+        </button>
+      </div>
+    </ng-container>
+
   </div>
 </div>

@@ -190,9 +190,10 @@ export class PayrollPeriodService {
   getByCompany(companyId: string): Observable<PayrollPeriod[]> {
     return this.api.get(`/payroll-periods/company/${companyId}`);
   }
-  
-  getActivePeriod(companyId: string): Observable<PayrollPeriod> {
-    return this.api.get(`/payroll-periods/company/${companyId}/active`);
+
+  /** Vérifie si une période OPEN existe pour cette entreprise */
+  getOpenPeriod(companyId: string): Observable<{ open: boolean; period: PayrollPeriod | null }> {
+    return this.api.get(`/payroll-periods/open/${companyId}`);
   }
   
   create(data: Partial<PayrollPeriod>): Observable<PayrollPeriod> {
@@ -207,7 +208,8 @@ export class PayrollPeriodService {
     return this.api.delete(`/payroll-periods/${id}`);
   }
   
-  closePeriod(id: string): Observable<PayrollPeriod> {
+  /** Clôture une période et ouvre automatiquement la suivante */
+  closePeriod(id: string): Observable<{ closed: PayrollPeriod; opened: PayrollPeriod | null; message: string }> {
     return this.api.post(`/payroll-periods/${id}/close`, {});
   }
 }
