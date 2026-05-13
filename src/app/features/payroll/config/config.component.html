@@ -1,7 +1,5 @@
 <div class="pc-wrapper">
 
-  
-
   <!-- Header -->
   <div class="pc-header">
     <div class="pc-header__left">
@@ -11,11 +9,12 @@
         <p class="pc-header__sub">Paramètres de calcul par entreprise</p>
       </div>
     </div>
-    <!-- Bouton Ajouter - visible pour Super Admin -->
+    <!-- ✅ BOUTON AJOUTER - VISIBLE SEULEMENT POUR SUPER ADMIN -->
     <button class="pc-btn pc-btn--primary" (click)="openAddModal()" *ngIf="isSuperAdmin">
       <span>＋</span> Nouvelle configuration
     </button>
   </div>
+
   <!-- Alertes -->
   <div class="pc-alert pc-alert--success" *ngIf="successMessage">
     <span>✓</span> {{ successMessage }}
@@ -40,7 +39,7 @@
     </div>
   </div>
 
-  <!-- Recherche -->
+  <!-- Recherche (Super Admin) -->
   <div class="pc-toolbar" *ngIf="isSuperAdmin">
     <div class="pc-search">
       <svg class="pc-search__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -68,6 +67,7 @@
     <table class="pc-table">
       <thead>
         <tr>
+          <!-- ✅ COLONNE ENTREPRISE VISIBLE SEULEMENT POUR SUPER ADMIN -->
           <th *ngIf="isSuperAdmin">ENTREPRISE</th>
           <th>RÉGIME</th>
           <th>DEVISE</th>
@@ -83,7 +83,7 @@
       <tbody>
         <tr *ngFor="let config of filteredConfigs" class="pc-table__row">
 
-          <!-- Entreprise -->
+          <!-- ✅ ENTREPRISE VISIBLE SEULEMENT POUR SUPER ADMIN -->
           <td *ngIf="isSuperAdmin">
             <div class="pc-company">
               <div class="pc-company__avatar">{{ getCompanyName(config).charAt(0) }}</div>
@@ -115,7 +115,7 @@
           <!-- Jours mois -->
           <td class="pc-num">{{ config.workingDaysPerMonth !== null ? (config.workingDaysPerMonth + 'j') : '—' }}</td>
 
-          <!-- Modules (uniquement ceux prévus par la licence de l’entreprise) -->
+          <!-- Modules -->
           <td>
             <div class="pc-modules">
               <span *ngIf="tableModulePills(config).length === 0" class="pc-modules__pending">—</span>
@@ -144,7 +144,7 @@
                   <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                 </svg>
               </button>
-              <!-- Bouton Supprimer - visible pour Super Admin -->
+              <!-- ✅ SUPPRIMER VISIBLE SEULEMENT POUR SUPER ADMIN -->
               <button type="button" class="pc-action pc-action--delete" (click)="deleteConfig(config.id)"
                       title="Supprimer" *ngIf="isSuperAdmin">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -159,6 +159,7 @@
         </tr>
 
         <tr *ngIf="filteredConfigs.length === 0">
+          <!-- ✅ COLSPAN ADAPTÉ SELON LE RÔLE -->
           <td [attr.colspan]="isSuperAdmin ? 10 : 9" class="pc-empty">
             <div>📋</div>
             <span>Aucune configuration trouvée</span>
@@ -195,7 +196,7 @@
     <!-- Formulaire -->
     <div class="modal-body" [formGroup]="configForm">
 
-      <!-- Entreprise (visible uniquement pour Super Admin en création) -->
+      <!-- ✅ SUPER ADMIN : Selecteur entreprise -->
       <div class="form-section" *ngIf="isSuperAdmin && !editingConfig">
         <div class="form-section__title">
           <span class="form-section__dot"></span> Entreprise
@@ -211,6 +212,9 @@
           <span class="form-error" *ngIf="isFieldInvalid('companyId')">Champ requis</span>
         </div>
       </div>
+
+      <!-- ✅ ADMIN : AUCUN champ entreprise (automatique, masqué) -->
+      <!-- companyId deja défini dans openAddModal() -->
 
       <!-- Paramètres généraux -->
       <div class="form-section">
@@ -273,7 +277,7 @@
                      formControlName="overtimeHoursForRate" placeholder="0">
               <span class="form-unit">h</span>
             </div>
-            <span class="form-hint">Ajoutées à l’heures/mois pour le taux : salaire ÷ (h/mois + h.sup.)</span>
+            <span class="form-hint">Ajoutées à l'heures/mois pour le taux : salaire ÷ (h/mois + h.sup.)</span>
             <span class="form-error" *ngIf="isFieldInvalid('overtimeHoursForRate')">≥ 0</span>
           </div>
 
@@ -291,7 +295,7 @@
         <p class="form-hint hourly-rate-example" *ngIf="hourlyRateExampleLine">{{ hourlyRateExampleLine }}</p>
       </div>
 
-      <!-- Modules activés — identiques à l’écran Licences (lecture seule) -->
+      <!-- Modules activés -->
       <div class="form-section">
         <div class="form-section__title">
           <span class="form-section__dot"></span> Modules activés (licence)
@@ -316,7 +320,7 @@
         <div
           class="license-modules-empty text-muted"
           *ngIf="!licenseLoading && !licenseLoadError && licenseModules && licenseModulesFromLicense.length === 0">
-          Aucun module n’est activé sur cette licence. Activez les modules dans l’écran <strong>Licences</strong> (super admin).
+          Aucun module n'est activé sur cette licence. Activez les modules dans l'écran <strong>Licences</strong> (super admin).
         </div>
 
         <div class="form-checkboxes license-modules-readonly" *ngIf="licenseModulesFromLicense.length > 0">

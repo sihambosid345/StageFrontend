@@ -13,7 +13,6 @@ export interface PayrollConfig {
   currency: string;
   weeklyHours: number | null;
   monthlyHours: number | null;
-  /** Heures sup. ajoutées au dénominateur du taux horaire : salaire ÷ (monthlyHours + ce champ). */
   overtimeHoursForRate: number | null;
   workingDaysPerMonth: number | null;
   cnssEnabled: boolean;
@@ -37,7 +36,6 @@ export interface PayrollConfig {
   };
 }
 
-/** Modules de cotisation : source = licence entreprise (affichage + payload sauvegarde). */
 export interface LicenseModulesSnapshot {
   cnssEnabled: boolean;
   amoEnabled: boolean;
@@ -62,7 +60,6 @@ interface LicenseApiResponse {
   endsAt?: string | null;
 }
 
-/** Ligne affichée = même logique que l’écran Licences (modules activés). */
 export interface LicenseModuleRow {
   code: string;
   label: string;
@@ -100,19 +97,15 @@ export class PayrollConfigComponent implements OnInit, OnDestroy {
   editingConfig: PayrollConfig | null = null;
   errorMessage = '';
   successMessage = '';
-  dataLoaded = false; // Nouveau flag pour suivre l'état du chargement
+  dataLoaded = false;
 
-  // Variable pour suivre si l'API a répondu
   apiResponded = false;
 
-  /** Modules CNSS / AMO / IR / CIMR / Damancom — lus depuis la licence (non modifiables ici). */
   licenseModules: LicenseModulesSnapshot | null = null;
-  /** Réponse licence brute (pour libellés / résumé). */
   licenseApiSnapshot: LicenseApiResponse | null = null;
   licenseLoading = false;
   licenseLoadError = '';
 
-  /** Licence par entreprise — pour colonne Modules du tableau (super admin : GET /licenses). */
   private readonly licenseSnapshotByCompanyId = new Map<string, LicenseApiResponse>();
 
   get isSuperAdmin(): boolean {
@@ -201,7 +194,6 @@ export class PayrollConfigComponent implements OnInit, OnDestroy {
         this.configForm.patchValue({ monthlyHours: next }, { emitEvent: false });
       });
 
-    // Initialisation sécurisée avec NgZone
     this.initializeData();
   }
 
@@ -210,7 +202,6 @@ export class PayrollConfigComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  /** Aperçu formule taux horaire : salaire ÷ heures travaillées par mois. */
   get hourlyRateExampleLine(): string {
     const cur = (this.configForm.get('currency')?.value as string) || 'MAD';
     const salary = 5000;
@@ -236,10 +227,17 @@ export class PayrollConfigComponent implements OnInit, OnDestroy {
     }
   }
 
-  /**
-   * Heures/mois pour le formulaire ou l’affichage : 44×52÷12 (≈190,67) par défaut.
-   * Ancienne valeur arrondie 191,33 pour 44 h/semaine est remplacée par le calcul légal.
-   */
+  getUserCompanyName(): string {
+    try {
+      const userStr = localStorage.getItem('user');
+      if (!userStr) return 'Mon entreprise';
+      const user = JSON.parse(userStr);
+      return user?.companyName || user?.company?.name || 'Mon entreprise';
+    } catch {
+      return 'Mon entreprise';
+    }
+  }
+
   private displayMonthlyHours(
     weekly: number | null | undefined,
     stored: number | null | undefined
@@ -262,14 +260,12 @@ export class PayrollConfigComponent implements OnInit, OnDestroy {
     };
   }
 
-  /** Entreprise concernée par le formulaire modal (création ou édition). */
   get companyIdForModal(): string {
     if (this.editingConfig) return this.editingConfig.companyId;
     if (this.isSuperAdmin) return this.configForm.get('companyId')?.value || '';
     return this.getUserCompanyId();
   }
 
-  /** Sauvegarde possible seulement si la licence a été chargée (modules imposés par la licence). */
   get canSavePayrollConfig(): boolean {
     if (this.licenseLoading || this.licenseLoadError) return false;
     const cid = this.companyIdForModal;
@@ -277,10 +273,6 @@ export class PayrollConfigComponent implements OnInit, OnDestroy {
     return !!this.licenseModules;
   }
 
-  /**
-   * Modules activés sur la licence — même ordre et libellés que l’écran « Licences »
-   * (Paie, RH, CNSS, Taxes, Damancom). AMO et CIMR en complément si prévus par la licence.
-   */
   get licenseModulesFromLicense(): LicenseModuleRow[] {
     const lic = this.licenseApiSnapshot;
     if (!lic) return [];
@@ -356,10 +348,6 @@ export class PayrollConfigComponent implements OnInit, OnDestroy {
     };
   }
 
-  /**
-   * Pastilles « Modules » : uniquement ceux présents sur la licence de l’entreprise.
-   * Couleur « on » = activé dans la config paie (ou toujours pour Paie/RH sous licence).
-   */
   tableModulePills(config: PayrollConfig): { label: string; on: boolean; licensedOnly: boolean }[] {
     const lic = this.licenseSnapshotByCompanyId.get(config.companyId);
     if (!lic) return [];
@@ -505,15 +493,10 @@ export class PayrollConfigComponent implements OnInit, OnDestroy {
     this.licenseLoadError = '';
   }
 
-  /**
-   * Méthode d'initialisation robuste qui garantit le chargement des données
-   */
   private async initializeData(): Promise<void> {
     try {
-      // Étape 1: Attendre que le composant soit complètement initialisé
       await this.waitForStableState();
       
-      // Étape 2: Charger les données dans la zone Angular
       this.ngZone.run(() => {
         this.loadConfigurations();
         
@@ -523,7 +506,6 @@ export class PayrollConfigComponent implements OnInit, OnDestroy {
         }
       });
       
-      // Étape 3: Forcer la détection de changement après un court délai
       setTimeout(() => {
         this.cdr.detectChanges();
       }, 50);
@@ -533,16 +515,11 @@ export class PayrollConfigComponent implements OnInit, OnDestroy {
     }
   }
 
-  /**
-   * Attendre que l'état soit stable avant de charger les données
-   */
   private waitForStableState(): Promise<void> {
     return new Promise((resolve) => {
       if (this.ngZone.isStable) {
-        // Déjà stable, attendre le prochain cycle
         setTimeout(() => resolve(), 0);
       } else {
-        // Attendre que la zone soit stable
         const subscription = this.ngZone.onStable.subscribe(() => {
           subscription.unsubscribe();
           setTimeout(() => resolve(), 0);
@@ -572,7 +549,6 @@ export class PayrollConfigComponent implements OnInit, OnDestroy {
             this.apiResponded = true;
             this.dataLoaded = true;
             
-            // Forcer la détection de changement
             this.cdr.markForCheck();
             this.cdr.detectChanges();
             
@@ -592,114 +568,97 @@ export class PayrollConfigComponent implements OnInit, OnDestroy {
   }
 
   loadConfigurations() {
-    this.loading = true;
-    this.errorMessage = '';
+  this.loading = true;
+  this.errorMessage = '';
 
-    let url = this.apiUrl;
-    if (this.isSuperAdmin) {
-      url = `${this.apiUrl}/all`;
-    }
-
-    console.log('=== LOADING CONFIGURATIONS ===');
-    console.log('URL:', url);
-    console.log('isSuperAdmin:', this.isSuperAdmin);
-    console.log('Headers:', this.authHeaders);
-    
-    this.http.get<PayrollConfig[]>(url, { headers: this.authHeaders })
-      .pipe(
-        catchError((error: HttpErrorResponse) => {
-          console.error('API Error:', error);
-          let message = '';
-          if (error.status === 0) {
-            message = '❌ Impossible de se connecter au serveur. Vérifiez que le backend est démarré sur le port 3000.';
-          } else if (error.status === 401) {
-            message = '❌ Non authentifié. Veuillez vous reconnecter.';
-          } else if (error.status === 403) {
-            message = '❌ Accès non autorisé. Vous n\'avez pas les permissions nécessaires.';
-          } else if (error.status === 404) {
-            message = '❌ API non trouvée. Vérifiez que le endpoint est correct.';
-          } else {
-            message = `❌ Erreur ${error.status}: ${error.message}`;
-          }
-          this.errorMessage = message;
-          return of([]);
-        }),
-        finalize(() => {
-          this.loading = false;
-          console.log('Loading finished, loading =', this.loading);
-        })
-      )
-      .subscribe({
-        next: (data) => {
-          this.ngZone.run(() => {
-            console.log('=== DATA RECEIVED ===');
-            console.log('Raw data type:', typeof data);
-            console.log('Is array:', Array.isArray(data));
-            console.log('Raw data:', JSON.stringify(data, null, 2));
-            
-            // Réinitialiser le message d'erreur si on reçoit des données
-            this.errorMessage = '';
-            
-            if (Array.isArray(data) && data.length > 0) {
-              this.configurations = data.map((d) => this.normalizePayrollConfigRow(d as PayrollConfig));
-              this.dataLoaded = true;
-            } else if (data && !Array.isArray(data)) {
-              this.configurations = [this.normalizePayrollConfigRow(data as PayrollConfig)];
-              this.dataLoaded = true;
-            } else if (Array.isArray(data) && data.length === 0) {
-              this.configurations = [];
-              this.errorMessage = 'Aucune configuration trouvée. Cliquez sur "Nouvelle configuration" pour en créer une.';
-              this.dataLoaded = true;
-            } else {
-              this.configurations = [];
-              this.errorMessage = 'Format de données invalide reçu du serveur.';
-              this.dataLoaded = true;
-            }
-            
-            // Mettre à jour les configurations filtrées
-            this.filteredConfigs = [...this.configurations];
-
-            this.hydrateLicenseMapForConfigs(this.configurations);
-            
-            // Forcer la mise à jour de la vue
-            this.cdr.markForCheck();
-            this.cdr.detectChanges();
-            
-            console.log('Configurations count:', this.configurations.length);
-            console.log('First config:', this.configurations[0]);
-            console.log('Filtered configs count:', this.filteredConfigs.length);
-            console.log('View should be updated now');
-          });
-        },
-        error: (err) => {
-          this.ngZone.run(() => {
-            console.error('Subscription error:', err);
-            this.configurations = [];
-            this.filteredConfigs = [];
-            this.errorMessage = 'Erreur lors du chargement des données. Vérifiez la console.';
-            this.dataLoaded = true;
-            this.cdr.detectChanges();
-          });
-        }
-      });
+  let url = this.apiUrl;
+  if (this.isSuperAdmin) {
+    url = `${this.apiUrl}/all`;
   }
 
-  /**
-   * Méthode de rafraîchissement forcé qui vide d'abord les données
-   */
+  console.log('=== LOADING CONFIGURATIONS ===');
+  console.log('URL:', url);
+  console.log('isSuperAdmin:', this.isSuperAdmin);
+  
+  this.http.get<PayrollConfig[] | PayrollConfig>(url, { headers: this.authHeaders })
+    .pipe(
+      catchError((error: HttpErrorResponse) => {
+        console.error('API Error:', error);
+        let message = '';
+        if (error.status === 0) {
+          message = '❌ Impossible de se connecter au serveur.';
+        } else if (error.status === 401) {
+          message = '❌ Non authentifié.';
+        } else if (error.status === 403) {
+          message = '❌ Accès non autorisé.';
+        } else if (error.status === 404) {
+          message = '❌ API non trouvée.';
+        } else {
+          message = `❌ Erreur ${error.status}: ${error.message}`;
+        }
+        this.errorMessage = message;
+        return of(null);
+      }),
+      finalize(() => {
+        this.loading = false;
+      })
+    )
+    .subscribe({
+      next: (data) => {
+        this.ngZone.run(() => {
+          console.log('=== DATA RECEIVED ===');
+          console.log('Raw data:', data);
+          console.log('Is array:', Array.isArray(data));
+          
+          this.errorMessage = '';
+          
+          if (data === null) {
+            this.configurations = [];
+            this.errorMessage = 'Erreur de connexion au serveur.';
+            this.dataLoaded = true;
+          } else if (Array.isArray(data)) {
+            // ✅ Super Admin : array
+            this.configurations = data.map((d) => this.normalizePayrollConfigRow(d));
+            this.dataLoaded = true;
+          } else if (typeof data === 'object' && data.id) {
+            // ✅ Admin : object wa7ed
+            this.configurations = [this.normalizePayrollConfigRow(data)];
+            this.dataLoaded = true;
+          } else {
+            this.configurations = [];
+            this.errorMessage = 'Format de données invalide.';
+            this.dataLoaded = true;
+          }
+          
+          this.filteredConfigs = [...this.configurations];
+          this.hydrateLicenseMapForConfigs(this.configurations);
+          
+          this.cdr.markForCheck();
+          this.cdr.detectChanges();
+        });
+      },
+      error: (err) => {
+        this.ngZone.run(() => {
+          this.configurations = [];
+          this.filteredConfigs = [];
+          this.errorMessage = 'Erreur lors du chargement.';
+          this.dataLoaded = true;
+          this.cdr.detectChanges();
+        });
+      }
+    });
+}
+
   forceRefresh() {
     console.log('Force refresh...');
     
-    // Vider les données existantes
     this.configurations = [];
     this.filteredConfigs = [];
     this.companies = [];
     this.dataLoaded = false;
     
-    // Forcer la mise à jour de la vue
     this.cdr.detectChanges();
     
-    // Recharger après un court délai
     setTimeout(() => {
       this.loadConfigurations();
       if (this.isSuperAdmin) {
@@ -721,7 +680,6 @@ export class PayrollConfigComponent implements OnInit, OnDestroy {
     );
     console.log('Search results:', this.filteredConfigs.length);
     
-    // Forcer la mise à jour après la recherche
     this.cdr.detectChanges();
   }
 
@@ -765,7 +723,6 @@ export class PayrollConfigComponent implements OnInit, OnDestroy {
     return map[regime] || regime?.replace(/_/g, ' ') || '—';
   }
 
-  /** Conservée pour compatibilité si le template appelle encore moduleOn(...). */
   moduleOn(lic: LicenseModulesSnapshot, key: keyof LicenseModulesSnapshot): boolean {
     return !!lic?.[key];
   }
@@ -779,9 +736,12 @@ export class PayrollConfigComponent implements OnInit, OnDestroy {
     this.editingConfig = null;
     this.errorMessage = '';
     this.resetLicenseState();
+    
+    const userCompanyId = this.getUserCompanyId();
+    
     this.configForm.reset(
       {
-        companyId: '',
+        companyId: this.isSuperAdmin ? '' : userCompanyId,
         regime: 'MOROCCO_STANDARD',
         currency: 'MAD',
         weeklyHours: 44,
@@ -794,9 +754,13 @@ export class PayrollConfigComponent implements OnInit, OnDestroy {
       },
       { emitEvent: false }
     );
+    
     this.showModal = true;
 
-    // Si Super Admin et entreprises non chargées, les recharger
+    if (!this.isSuperAdmin && userCompanyId) {
+      this.loadLicenseModules(userCompanyId);
+    }
+    
     if (this.isSuperAdmin && this.companies.length === 0) {
       this.loadCompanies();
     }
@@ -833,125 +797,123 @@ export class PayrollConfigComponent implements OnInit, OnDestroy {
   }
 
   saveConfig() {
-    // Validation spéciale pour Super Admin
-    if (this.isSuperAdmin && !this.editingConfig) {
-      const selectedCompanyId = this.configForm.get('companyId')?.value;
-      if (!selectedCompanyId || selectedCompanyId === '') {
-        this.errorMessage = 'Veuillez sélectionner une entreprise';
-        this.configForm.get('companyId')?.markAsTouched();
-        return;
-      }
-    }
+  if (this.configForm.invalid) {
+    this.configForm.markAllAsTouched();
+    return;
+  }
 
-    if (this.configForm.invalid) {
-      this.configForm.markAllAsTouched();
-      console.log('Form invalid:', this.configForm.errors);
-      return;
-    }
+  const companyIdForSave =
+    this.editingConfig?.companyId ??
+    (this.isSuperAdmin ? this.configForm.get('companyId')?.value : this.getUserCompanyId());
 
-    const companyIdForSave =
-      this.editingConfig?.companyId ??
-      (this.isSuperAdmin ? this.configForm.get('companyId')?.value : this.getUserCompanyId());
+  if (!this.licenseModules && companyIdForSave) {
+    this.loadLicenseModules(companyIdForSave);
+    this.errorMessage = 'Chargement de la licence en cours. Patientez puis réessayez.';
+    return;
+  }
 
-    if (!this.licenseModules && companyIdForSave) {
-      this.loadLicenseModules(companyIdForSave);
-      this.errorMessage =
-        'Chargement de la licence en cours. Les modules (CNSS, AMO, IR, etc.) proviennent de la licence : patientez puis réessayez.';
-      return;
-    }
+  if (!this.licenseModules) {
+    this.errorMessage = 'Impossible d\'enregistrer : licence non disponible.';
+    return;
+  }
 
-    if (!this.licenseModules) {
-      this.errorMessage =
-        'Impossible d’enregistrer : licence non disponible. Vérifiez la licence de l’entreprise (menu Licences).';
-      return;
-    }
+  this.saving = true;
+  this.errorMessage = '';
 
-    this.saving = true;
-    this.errorMessage = '';
+  const raw = this.configForm.value;
 
-    const raw = this.configForm.value;
+  let overtimeHoursForRate: number | null = null;
+  const otRaw = raw.overtimeHoursForRate;
+  if (otRaw !== null && otRaw !== undefined && String(otRaw).trim() !== '') {
+    const n = Number(otRaw);
+    overtimeHoursForRate = Number.isFinite(n) ? n : null;
+  }
+  
+  const payload = {
+    regime: raw.regime,
+    currency: raw.currency,
+    weeklyHours: raw.weeklyHours ? Number(raw.weeklyHours) : null,
+    monthlyHours: raw.monthlyHours ? Number(raw.monthlyHours) : null,
+    overtimeHoursForRate,
+    workingDaysPerMonth: raw.workingDaysPerMonth ? Number(raw.workingDaysPerMonth) : null,
+    cnssEnabled: this.licenseModules.cnssEnabled,
+    amoEnabled: this.licenseModules.amoEnabled,
+    irEnabled: this.licenseModules.irEnabled,
+    cimrEnabled: this.licenseModules.cimrEnabled,
+    damancomEnabled: this.licenseModules.damancomEnabled,
+    defaultCnssDeclaredDays: raw.defaultCnssDeclaredDays
+      ? parseInt(raw.defaultCnssDeclaredDays, 10)
+      : 26,
+    dateEffet: raw.dateEffet || new Date().toISOString().slice(0, 10),
+    isActive: Boolean(raw.isActive ?? true),
+    payslipTemplate: raw.payslipTemplate || null,
+    notes: raw.notes || null,
+  };
+  
+  let obs: Observable<PayrollConfig>;
 
-    let overtimeHoursForRate: number | null = null;
-    const otRaw = raw.overtimeHoursForRate;
-    if (otRaw !== null && otRaw !== undefined && String(otRaw).trim() !== '') {
-      const n = Number(otRaw);
-      overtimeHoursForRate = Number.isFinite(n) ? n : null;
-    }
-    const payload = {
-      regime: raw.regime,
-      currency: raw.currency,
-      weeklyHours: raw.weeklyHours ? Number(raw.weeklyHours) : null,
-      monthlyHours: raw.monthlyHours ? Number(raw.monthlyHours) : null,
-      overtimeHoursForRate,
-      workingDaysPerMonth: raw.workingDaysPerMonth ? Number(raw.workingDaysPerMonth) : null,
-      cnssEnabled: this.licenseModules.cnssEnabled,
-      amoEnabled: this.licenseModules.amoEnabled,
-      irEnabled: this.licenseModules.irEnabled,
-      cimrEnabled: this.licenseModules.cimrEnabled,
-      damancomEnabled: this.licenseModules.damancomEnabled,
-      defaultCnssDeclaredDays: raw.defaultCnssDeclaredDays
-        ? parseInt(raw.defaultCnssDeclaredDays, 10)
-        : 26,
-      dateEffet: raw.dateEffet || new Date().toISOString().slice(0, 10),
-      isActive: Boolean(raw.isActive ?? true),
-      payslipTemplate: raw.payslipTemplate || null,
-      notes: raw.notes || null,
-    };
-    let obs: Observable<PayrollConfig>;
-
-    if (this.editingConfig) {
-      console.log('Updating config:', this.editingConfig.id);
+  if (this.editingConfig) {
+    if (this.isSuperAdmin) {
+      // Super Admin : PUT /:id
       obs = this.http.put<PayrollConfig>(
         `${this.apiUrl}/${this.editingConfig.id}`,
         payload,
         { headers: this.authHeaders }
       );
-    } else if (this.isSuperAdmin) {
+    } else {
+      // Admin : PUT / (backend yutilise req.user.companyId)
+      obs = this.http.put<PayrollConfig>(
+        this.apiUrl,
+        payload,
+        { headers: this.authHeaders }
+      );
+    }
+  } else {
+    if (this.isSuperAdmin) {
+      // Super Admin : POST / avec companyId
       const companyId = raw.companyId;
       if (!companyId) {
         this.errorMessage = 'Veuillez sélectionner une entreprise';
         this.saving = false;
         return;
       }
-      console.log('Creating config for company:', companyId);
       obs = this.http.post<PayrollConfig>(
         this.apiUrl,
         { ...payload, companyId: companyId },
         { headers: this.authHeaders }
       );
     } else {
-      console.log('Upsert config');
+      // Admin : POST / (backend yutilise req.user.companyId)
       obs = this.http.post<PayrollConfig>(
-        `${this.apiUrl}/upsert`,
+        this.apiUrl,
         payload,
         { headers: this.authHeaders }
       );
     }
-
-    obs.subscribe({
-      next: (response) => {
-        this.ngZone.run(() => {
-          console.log('Save success:', response);
-          this.saving = false;
-          this.successMessage = 'Configuration enregistrée avec succès';
-          this.closeModal();
-          this.loadConfigurations();
-          setTimeout(() => {
-            this.successMessage = '';
-            this.cdr.detectChanges();
-          }, 3000);
-        });
-      },
-      error: (err) => {
-        this.ngZone.run(() => {
-          console.error('Save error:', err);
-          this.saving = false;
-          this.errorMessage = err.error?.error || err.message || 'Erreur lors de la sauvegarde';
-          this.cdr.detectChanges();
-        });
-      }
-    });
   }
+
+  obs.subscribe({
+    next: (response) => {
+      this.ngZone.run(() => {
+        this.saving = false;
+        this.successMessage = 'Configuration enregistrée avec succès';
+        this.closeModal();
+        this.loadConfigurations();
+        setTimeout(() => {
+          this.successMessage = '';
+          this.cdr.detectChanges();
+        }, 3000);
+      });
+    },
+    error: (err) => {
+      this.ngZone.run(() => {
+        this.saving = false;
+        this.errorMessage = err.error?.error || err.message || 'Erreur lors de la sauvegarde';
+        this.cdr.detectChanges();
+      });
+    }
+  });
+}
 
   deleteConfig(id: string) {
     if (!id) return;
