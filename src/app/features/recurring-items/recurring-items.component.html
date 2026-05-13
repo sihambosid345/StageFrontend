@@ -32,7 +32,7 @@
             <td>{{ getEmployeeName(item.employeeId) }}</td>
             <td><span class="badge bg-secondary">{{ item.type }}</span></td>
             <td>{{ item.label }}</td>
-            <td>{{ item.amount ?? '—' }}</td>
+            <td>{{ item.amount ?? (item.percentageValue ? item.percentageValue + '%' : '—') }}</td>
             <td>{{ item.effectiveFrom ? (item.effectiveFrom | date: 'yyyy-MM-dd') : '—' }}</td>
             <td>{{ item.effectiveTo ? (item.effectiveTo | date: 'yyyy-MM-dd') : '—' }}</td>
             <td>
@@ -64,54 +64,51 @@
       <div class="modal-body">
         <div *ngIf="error" class="alert alert-danger">{{ error }}</div>
 
-        <div class="form-grid">
-          <!-- Super Admin : entreprise -->
-          <div class="span-2" *ngIf="isSuperAdmin">
-            <label class="form-label">Entreprise <span class="required">*</span></label>
-            <select class="form-select" [(ngModel)]="form.companyId" (ngModelChange)="onCompanyChange()">
-              <option value="">-- sélectionner une entreprise --</option>
-              <option *ngFor="let c of companies" [value]="c.id">{{ c.name }}</option>
-            </select>
-          </div>
+        <!-- Company Selection (Super Admin only) -->
+        <div *ngIf="isSuperAdmin" class="mb-3">
+          <label class="form-label">Entreprise <span class="required">*</span></label>
+          <select class="form-select" [(ngModel)]="form.companyId" (ngModelChange)="onCompanyChange()">
+            <option value="">-- sélectionner une entreprise --</option>
+            <option *ngFor="let c of companies" [value]="c.id">{{ c.name }}</option>
+          </select>
+        </div>
 
-          <!-- Département -->
-          <div *ngIf="isSuperAdmin ? form.companyId : true">
+        <!-- Department & Position Row -->
+        <div class="row mb-3">
+          <div class="col">
             <label class="form-label">Département</label>
-            <select class="form-select" [(ngModel)]="form.departmentId" (ngModelChange)="onDepartmentChange()"
-              [disabled]="isSuperAdmin && !form.companyId">
+            <select class="form-select" [(ngModel)]="form.departmentId" (ngModelChange)="onDepartmentChange()">
               <option value="">— Tous —</option>
               <option *ngFor="let d of departments" [value]="d.id">{{ d.name }}</option>
             </select>
           </div>
-
-          <!-- Poste -->
-          <div *ngIf="isSuperAdmin ? form.companyId : true">
+          <div class="col">
             <label class="form-label">Poste</label>
-            <select class="form-select" [(ngModel)]="form.positionId" (ngModelChange)="onPositionChange()"
-              [disabled]="isSuperAdmin && !form.companyId">
+            <select class="form-select" [(ngModel)]="form.positionId" (ngModelChange)="onPositionChange()">
               <option value="">— Tous —</option>
               <option *ngFor="let p of positions" [value]="p.id">{{ p.name }}</option>
             </select>
           </div>
+        </div>
 
-          <!-- Employé -->
-          <div class="span-2">
-            <label class="form-label">Employé <span class="required">*</span></label>
-            <select class="form-select" [(ngModel)]="form.employeeId">
-              <option value="">-- sélectionner un employé --</option>
-              <option *ngFor="let e of filteredEmployees" [value]="e.id">{{ e.firstName }} {{ e.lastName }}</option>
-            </select>
-            <small class="text-muted" *ngIf="isSuperAdmin && !form.companyId">Choisissez d'abord l'entreprise.</small>
-          </div>
+        <!-- Employee -->
+        <div class="mb-3">
+          <label class="form-label">Employé <span class="required">*</span></label>
+          <select class="form-select" [(ngModel)]="form.employeeId">
+            <option value="">-- sélectionner un employé --</option>
+            <option *ngFor="let e of filteredEmployees" [value]="e.id">{{ e.firstName }} {{ e.lastName }}</option>
+          </select>
+        </div>
 
-          <!-- Type / Valeur -->
-          <div>
+        <!-- Type & Value Type Row -->
+        <div class="row mb-3">
+          <div class="col">
             <label class="form-label">Type <span class="required">*</span></label>
             <select class="form-select" [(ngModel)]="form.type">
               <option *ngFor="let t of typeOptions" [value]="t">{{ t }}</option>
             </select>
           </div>
-          <div>
+          <div class="col">
             <label class="form-label">Type de valeur</label>
             <select class="form-select" [(ngModel)]="form.valueType">
               <option value="FIXED">FIXED</option>
@@ -119,56 +116,57 @@
               <option value="SENIORITY_SCALE">SENIORITY_SCALE</option>
             </select>
           </div>
+        </div>
 
-          <!-- Libellé -->
-          <div class="span-2">
-            <label class="form-label">Libellé <span class="required">*</span></label>
-            <input class="form-control" [(ngModel)]="form.label" placeholder="Ex: Transport mensuel" />
-          </div>
+        <!-- Label -->
+        <div class="mb-3">
+          <label class="form-label">Libellé <span class="required">*</span></label>
+          <input class="form-control" [(ngModel)]="form.label" placeholder="Ex: Transport mensuel" />
+        </div>
 
-          <!-- Montant / Pourcentage -->
-          <div *ngIf="form.valueType === 'FIXED'">
-            <label class="form-label">Montant</label>
-            <input type="number" class="form-control" [(ngModel)]="form.amount" placeholder="0.00" step="0.01" />
-          </div>
-          <div *ngIf="form.valueType === 'PERCENTAGE'">
-            <label class="form-label">Pourcentage (%)</label>
-            <input type="number" class="form-control" [(ngModel)]="form.percentageValue" placeholder="0" step="0.01" />
-          </div>
-          <!-- Espace réservé si ni FIXED ni PERCENTAGE (SENIORITY_SCALE) -->
-          <div *ngIf="form.valueType !== 'FIXED' && form.valueType !== 'PERCENTAGE'"></div>
+        <!-- Amount / Percentage (conditional) -->
+        <div class="mb-3" *ngIf="form.valueType === 'FIXED'">
+          <label class="form-label">Montant</label>
+          <input type="number" class="form-control" [(ngModel)]="form.amount" placeholder="0.00" step="0.01" />
+        </div>
 
-          <!-- Début / Fin -->
-          <div>
+        <div class="mb-3" *ngIf="form.valueType === 'PERCENTAGE'">
+          <label class="form-label">Pourcentage (%)</label>
+          <input type="number" class="form-control" [(ngModel)]="form.percentageValue" placeholder="0" step="0.01" />
+        </div>
+
+        <!-- Date Range Row -->
+        <div class="row mb-3">
+          <div class="col">
             <label class="form-label">Date début <span class="required">*</span></label>
             <input type="date" class="form-control" [(ngModel)]="form.effectiveFrom" />
           </div>
-          <div>
+          <div class="col">
             <label class="form-label">Date fin</label>
             <input type="date" class="form-control" [(ngModel)]="form.effectiveTo" />
           </div>
+        </div>
 
-          <!-- Checkboxes -->
-          <div class="span-2 form-grid three">
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="chkActive" [(ngModel)]="form.isActive" />
-              <label class="form-check-label" for="chkActive">Actif</label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="chkTaxable" [(ngModel)]="form.isTaxable" />
-              <label class="form-check-label" for="chkTaxable">Imposable</label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="chkCnss" [(ngModel)]="form.isCnssApplicable" />
-              <label class="form-check-label" for="chkCnss">CNSS</label>
-            </div>
+        <!-- Checkboxes -->
+        <div class="mb-3">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="chkActive" [(ngModel)]="form.isActive" />
+            <label class="form-check-label" for="chkActive">Actif</label>
           </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="chkTaxable" [(ngModel)]="form.isTaxable" />
+            <label class="form-check-label" for="chkTaxable">Imposable</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="chkCnss" [(ngModel)]="form.isCnssApplicable" />
+            <label class="form-check-label" for="chkCnss">CNSS</label>
+          </div>
+        </div>
 
-          <!-- Notes -->
-          <div class="span-2">
-            <label class="form-label">Notes</label>
-            <textarea class="form-control" rows="2" [(ngModel)]="form.notes" placeholder="Remarques éventuelles..."></textarea>
-          </div>
+        <!-- Notes -->
+        <div class="mb-3">
+          <label class="form-label">Notes</label>
+          <textarea class="form-control" rows="2" [(ngModel)]="form.notes" placeholder="Remarques éventuelles..."></textarea>
         </div>
       </div>
 
@@ -179,4 +177,3 @@
     </div>
   </div>
 </div>
-
