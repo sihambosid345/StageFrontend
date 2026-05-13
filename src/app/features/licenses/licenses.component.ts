@@ -302,34 +302,41 @@ export class LicensesComponent implements OnInit {
     this.cdr.detectChanges();
   }
 
-  save() {
-    if (!this.isSuperAdmin) {
-      this.form.companyId = this.currentCompanyId;
-    }
+save() {
+  if (!this.isSuperAdmin) {
+    this.form.companyId = this.currentCompanyId;
+  }
 
-    this.errors = validateRequired(this.form, ['companyId', 'planCode', 'startsAt']);
-    if (Object.keys(this.errors).length) {
-      this.cdr.detectChanges();
-      return;
-    }
+  this.errors = validateRequired(this.form, ['companyId', 'planCode', 'startsAt']);
+  if (Object.keys(this.errors).length) {
+    this.cdr.detectChanges();
+    return;
+  }
 
+  setTimeout(() => {
     const loadingId = this.toastService?.loading('Sauvegarde en cours...');
-    
-    const next = () => { 
-      this.showModal = false; 
+
+    const next = () => {
+      this.showModal = false;
       this.load();
-      this.cdr.detectChanges();
-      if (this.toastService) {
-        this.toastService.update(loadingId, this.editing ? 'Licence modifiée avec succès' : 'Licence créée avec succès', 'success', 4000);
-      }
+      setTimeout(() => {
+        this.toastService?.update(
+          loadingId,
+          this.editing ? 'Licence modifiée avec succès' : 'Licence créée avec succès',
+          'success', 5000
+        );
+        this.cdr.detectChanges();
+      }, 0);
     };
-    
-    const error = (e: any) => { 
-      this.errors['api'] = e?.error?.error || 'Erreur serveur';
-      this.cdr.detectChanges();
-      if (this.toastService) {
-        this.toastService.update(loadingId, this.errors['api'], 'error', 4000);
-      }
+
+    const error = (e: any) => {
+      // ✅ Message d'erreur clair — 409 = licence déjà existante
+      const message = e?.error?.error || 'Erreur serveur';
+      this.errors['api'] = message;
+      setTimeout(() => {
+        this.toastService?.update(loadingId, message, 'error', 6000);
+        this.cdr.detectChanges();
+      }, 0);
     };
 
     if (this.editing) {
@@ -337,7 +344,8 @@ export class LicensesComponent implements OnInit {
     } else {
       this.superAdminService.createOrUpdateLicense(this.form).subscribe({ next, error });
     }
-  }
+  }, 0);
+}
 
   delete(id: string) {
     if (!confirm('Supprimer cette licence ?')) return;
