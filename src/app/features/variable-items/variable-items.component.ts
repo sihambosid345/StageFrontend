@@ -295,7 +295,6 @@ export class VariableItemsComponent implements OnInit {
     const loadingId = this.toastService?.loading('Sauvegarde en cours...');
     
     const payload: any = {
-      companyId: this.auth.currentUser()?.companyId,
       employeeId: this.form.employeeId,
       type: this.form.type,
       valueType: this.form.valueType,
@@ -304,6 +303,7 @@ export class VariableItemsComponent implements OnInit {
       effectiveDate: this.form.effectiveDate,
       status: this.form.status,
     };
+    
     if (this.form.payrollPeriodId) payload.payrollPeriodId = this.form.payrollPeriodId;
     if (this.form.notes) payload.notes = this.form.notes;
 
