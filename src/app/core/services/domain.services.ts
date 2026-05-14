@@ -359,7 +359,7 @@ export class PayrollCalculationService {
    * Retourne le résultat du calcul avec totalEmployees, processed, errors, totaux.
    */
   calculate(runId: string): Observable<PayrollRunResult> {
-    return this.api.post(`/payroll-calculation/run/${runId}`, {});
+    return this.api.post(`/api/payroll-calculation/run/${runId}`, {});
   }
 
   /**
@@ -367,7 +367,7 @@ export class PayrollCalculationService {
    * GET /api/payroll-calculation/rates?companyId=...
    */
   getRates(companyId?: string): Observable<StatutoryRate[]> {
-    return this.api.get('/payroll-calculation/rates', { params: { companyId } });
+    return this.api.get('/api/payroll-calculation/rates', { params: { companyId } });
   }
 
   /**
@@ -378,7 +378,7 @@ export class PayrollCalculationService {
     const params: any = { taxCode };
     if (companyId) params.companyId = companyId;
     if (effectiveDate) params.effectiveDate = effectiveDate;
-    return this.api.get('/payroll-calculation/brackets', { params });
+    return this.api.get('/api/payroll-calculation/brackets', { params });
   }
 }
 

@@ -529,6 +529,7 @@ export interface EmployeeRecurringItem {
   isActive: boolean;
   isCnssApplicable: boolean;
   isTaxable: boolean;
+  isAmoApplicable: boolean;
   notes?: string | null;
   createdById?: string | null;
   createdBy?: Pick<User, 'id' | 'firstName' | 'lastName'> | null;
@@ -547,6 +548,7 @@ export interface CreateEmployeeRecurringItemPayload {
   seniorityRules?: Record<string, unknown>;
   isTaxable?: boolean;
   isCnssApplicable?: boolean;
+  isAmoApplicable?: boolean;
   isActive?: boolean;
   effectiveFrom: string;
   effectiveTo?: string;
@@ -719,6 +721,28 @@ export interface TaxBracket {
 
 // ─── Payroll Run Result (Correction 7) ───────────────────────────────────────
 
+export interface PayrollRunEmployeeResult {
+  employeeId: string;
+  employeeName: string;
+  success: boolean;
+  error?: string;
+  grossSalary?: number;
+  netSalary?: number;
+  // Correction 12 : bases distinctes
+  baseSalary?: number;
+  cnssGross?: number;
+  amoGross?: number;
+  taxableGross?: number;
+  cnssBase?: number;
+  cnssEmpAmount?: number;
+  amoEmpAmount?: number;
+  cimrEmpAmount?: number;
+  totalEmpCharges?: number;
+  irAmount?: number;
+  totalDeductions?: number;
+  totalErCharges?: number;
+}
+
 export interface PayrollRunResult {
   runId: string;
   totalEmployees: number;
@@ -728,14 +752,7 @@ export interface PayrollRunResult {
   totalNet: number;
   totalDeductions: number;
   totalErCharges: number;
-  results: Array<{
-    employeeId: string;
-    employeeName: string;
-    success: boolean;
-    error?: string;
-    grossSalary?: number;
-    netSalary?: number;
-  }>;
+  results: PayrollRunEmployeeResult[];
 }
 
 // ─── Variable Item Gain Mapping (Correction 13) ────────────────────────────
