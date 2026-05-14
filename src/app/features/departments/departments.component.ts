@@ -9,12 +9,11 @@ import {
   CreateDepartmentPayload, UpdateDepartmentPayload,
   FormErrors, validateRequired
 } from '../../core/models';
-import { SearchableSelectComponent } from '../../shared/searchable-select.component';
 
 @Component({
   selector: 'app-departments',
   standalone: true,
-  imports: [CommonModule, FormsModule, SearchableSelectComponent],
+  imports: [CommonModule, FormsModule],
   templateUrl: './departments.component.html',
   styleUrls: ['./departments.component.scss']
 })

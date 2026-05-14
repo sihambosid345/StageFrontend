@@ -752,7 +752,28 @@ export interface PayrollRunResult {
   totalNet: number;
   totalDeductions: number;
   totalErCharges: number;
-  results: PayrollRunEmployeeResult[];
+  results: Array<{
+    employeeId: string;
+    employeeName: string;
+    success?: boolean;
+    error?: string;
+    baseSalary?: number;
+    grossSalary?: number;
+    cnssGross?: number;
+    amoGross?: number;
+    taxableGross?: number;
+    cnssBase?: number;
+    cnssEmpAmount?: number;
+    amoEmpAmount?: number;
+    cimrEmpAmount?: number;
+    totalEmpCharges?: number;
+    irAmount?: number;
+    totalDeductions?: number;
+    netSalary?: number;
+    totalErCharges?: number;
+    payslipId?: string;
+    variableItemIds?: string[];
+  }>;
 }
 
 // ─── Variable Item Gain Mapping (Correction 13) ────────────────────────────
