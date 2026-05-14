@@ -1,7 +1,7 @@
 <div class="page-header">
   <div>
     <h1>Éléments variables</h1>
-    <p class="page-subtitle">Primes, avances, déductions et heures supplémentaires</p>
+    <p class="page-subtitle">Primes, avances, déductions et commissions</p>
   </div>
   <button class="btn btn-primary" (click)="openCreate()">
     <i class="bi bi-plus-lg"></i> Ajouter
@@ -12,7 +12,7 @@
   <div class="table-toolbar">
     <div class="toolbar-heading">
       <h2>Liste des éléments variables</h2>
-      <p class="toolbar-subtitle">Liste des éléments variables ({{ filtered.length }})</p>
+      <p class="toolbar-subtitle">{{ filtered.length }} élément(s)</p>
     </div>
     <div class="toolbar-actions">
       <div class="search-input">
@@ -22,45 +22,42 @@
       <div class="active-filters" *ngIf="companyFilterId || typeFilter || statusFilter">
         <div class="filter-chips">
           <span class="filter-chip" *ngIf="companyFilterId">
-            <i class="bi bi-building"></i>
-            {{ companyName(companyFilterId) }}
+            <i class="bi bi-building"></i> {{ companyName(companyFilterId) }}
             <button class="chip-remove" type="button" (click)="clearCompanyFilter()"><i class="bi bi-x"></i></button>
           </span>
           <span class="filter-chip" *ngIf="typeFilter">
-            <i class="bi bi-tags"></i>
-            {{ typeFilter }}
+            <i class="bi bi-tags"></i> {{ typeFilter }}
             <button class="chip-remove" type="button" (click)="clearTypeFilter()"><i class="bi bi-x"></i></button>
           </span>
           <span class="filter-chip" *ngIf="statusFilter">
-            <i class="bi bi-list-task"></i>
-            {{ statusFilter }}
+            <i class="bi bi-list-task"></i> {{ statusFilter }}
             <button class="chip-remove" type="button" (click)="clearStatusFilter()"><i class="bi bi-x"></i></button>
           </span>
         </div>
       </div>
       <button class="btn-filter" *ngIf="isSuperAdmin" (click)="openFilterPanel()" [class.active]="showFilterPanel">
-        <i class="bi bi-funnel-fill"></i>
-        <span>Filtrer</span>
+        <i class="bi bi-funnel-fill"></i> Filtrer
         <span class="filter-badge" *ngIf="companyFilterId || typeFilter || statusFilter">
           {{ (companyFilterId ? 1 : 0) + (typeFilter ? 1 : 0) + (statusFilter ? 1 : 0) }}
         </span>
       </button>
     </div>
   </div>
-  
+
   <div *ngIf="loading" class="loading-spinner"></div>
-  
+
   <div class="table-scroll" *ngIf="!loading">
     <table *ngIf="filtered.length > 0">
       <thead>
         <tr>
           <th>Employé</th>
           <th>Type</th>
+          <th>Nature</th>   <!-- Correction 3 : gain vs déduction -->
           <th>Libellé</th>
           <th>Montant</th>
           <th>Date effective</th>
-          <th>Période</th>
           <th>Statut</th>
+          <th>Flags</th>    <!-- Correction 4/5/6 : CNSS/IR/AMO -->
           <th>Actions</th>
         </tr>
       </thead>
@@ -73,21 +70,34 @@
             </div>
           </td>
           <td><span class="badge" [ngClass]="typeClass(item.type)">{{ item.type }}</span></td>
+          <!-- Correction 3 : badge GAIN vs RETENUE -->
+          <td>
+            <span class="badge" [ngClass]="isGain(item.type) ? 'badge-success' : 'badge-danger'">
+              {{ isGain(item.type) ? 'Gain' : 'Retenue' }}
+            </span>
+          </td>
           <td>{{ item.label }}</td>
-          <td class="amount-cell">{{ item.amount | number:'1.2-2' }} MAD</td>
+          <td class="amount-cell" [class.text-danger]="!isGain(item.type)">
+            {{ isGain(item.type) ? '' : '–' }}{{ item.amount | number:'1.2-2' }} MAD
+          </td>
           <td>{{ item.effectiveDate | date:'dd/MM/yyyy' }}</td>
-          <td>{{ item.payrollPeriodId ? getPeriodLabel(item.payrollPeriodId) : '—' }}</td>
           <td><span class="badge" [ngClass]="statusClass(item.status)">{{ item.status }}</span></td>
+          <!-- Correction 4/5/6 : flags CNSS/IR/AMO -->
+          <td>
+            <span class="flag-chip" [class.active]="item.isCnssApplicable" title="CNSS">C</span>
+            <span class="flag-chip" [class.active]="item.isTaxable"        title="IR">IR</span>
+            <span class="flag-chip" [class.active]="item.isAmoApplicable"  title="AMO">A</span>
+          </td>
           <td>
             <div class="actions">
               <button class="btn btn-icon btn-secondary" (click)="openEdit(item)" title="Modifier"><i class="bi bi-pencil"></i></button>
-              <button class="btn btn-icon btn-danger" (click)="delete(item.id)" title="Supprimer"><i class="bi bi-trash"></i></button>
+              <button class="btn btn-icon btn-danger"    (click)="delete(item.id)" title="Supprimer"><i class="bi bi-trash"></i></button>
             </div>
           </td>
         </tr>
       </tbody>
     </table>
-    
+
     <div class="empty-state" *ngIf="filtered.length === 0">
       <i class="bi bi-sliders" style="font-size:40px;color:var(--text-muted);"></i>
       <h3>Aucun élément variable</h3>
@@ -106,7 +116,9 @@
     <div class="filter-section">
       <h5><i class="bi bi-building"></i> Entreprise</h5>
       <div class="filter-options">
-        <button type="button" class="filter-option" *ngFor="let company of companies" [class.active]="pendingCompanyFilterId === company.id" (click)="togglePendingCompanySelection(company.id)">
+        <button type="button" class="filter-option" *ngFor="let company of companies"
+          [class.active]="pendingCompanyFilterId === company.id"
+          (click)="togglePendingCompanySelection(company.id)">
           <i class="bi" [ngClass]="pendingCompanyFilterId === company.id ? 'bi-check-circle-fill' : 'bi-circle'"></i>
           <span>{{ company.name }}</span>
         </button>
@@ -115,7 +127,9 @@
     <div class="filter-section">
       <h5><i class="bi bi-tags"></i> Type</h5>
       <div class="filter-options">
-        <button type="button" class="filter-option" *ngFor="let type of typeOptions" [class.active]="pendingTypeFilter === type" (click)="togglePendingTypeSelection(type)">
+        <button type="button" class="filter-option" *ngFor="let type of typeOptions"
+          [class.active]="pendingTypeFilter === type"
+          (click)="togglePendingTypeSelection(type)">
           <i class="bi" [ngClass]="pendingTypeFilter === type ? 'bi-check-circle-fill' : 'bi-circle'"></i>
           <span>{{ type }}</span>
         </button>
@@ -124,7 +138,9 @@
     <div class="filter-section">
       <h5><i class="bi bi-list-task"></i> Statut</h5>
       <div class="filter-options">
-        <button type="button" class="filter-option" *ngFor="let status of statusOptions" [class.active]="pendingStatusFilter === status" (click)="togglePendingStatusSelection(status)">
+        <button type="button" class="filter-option" *ngFor="let status of statusOptions"
+          [class.active]="pendingStatusFilter === status"
+          (click)="togglePendingStatusSelection(status)">
           <i class="bi" [ngClass]="pendingStatusFilter === status ? 'bi-check-circle-fill' : 'bi-circle'"></i>
           <span>{{ status }}</span>
         </button>
@@ -133,7 +149,7 @@
   </div>
   <div class="filter-panel-footer">
     <button class="btn btn-secondary" type="button" (click)="resetPendingFilters()">Réinitialiser</button>
-    <button class="btn btn-primary" type="button" (click)="applyPendingFilters()">Appliquer</button>
+    <button class="btn btn-primary"   type="button" (click)="applyPendingFilters()">Appliquer</button>
     <button class="btn btn-secondary" type="button" (click)="closeFilterPanel()">Fermer</button>
   </div>
 </div>
@@ -147,6 +163,13 @@
     </div>
     <div class="modal-body">
       <div class="error-msg" *ngIf="error"><i class="bi bi-exclamation-triangle-fill"></i> {{ error }}</div>
+
+      <!-- Correction 3 : info nature (gain vs retenue) -->
+      <div class="info-banner" *ngIf="form.type" [class.info-gain]="isGain(form.type)" [class.info-deduction]="!isGain(form.type)">
+        <i class="bi" [ngClass]="isGain(form.type) ? 'bi-arrow-up-circle-fill' : 'bi-arrow-down-circle-fill'"></i>
+        <span *ngIf="isGain(form.type)">Ce type est un <strong>gain</strong> — il contribue au salaire brut.</span>
+        <span *ngIf="!isGain(form.type)">Ce type est une <strong>retenue</strong> — il réduit le net SANS augmenter le brut.</span>
+      </div>
 
       <div class="form-group">
         <label>Employé <span class="req">*</span></label>
@@ -192,19 +215,43 @@
         <div class="form-group">
           <label>Statut</label>
           <select [(ngModel)]="form.status">
-            <option *ngFor="let s of statusOptions" [value]="s">{{ s }}</option>
+            <!-- Correction 10 : APPLIED retiré du formulaire — géré par le moteur -->
+            <option *ngFor="let s of editableStatuses" [value]="s">{{ s }}</option>
           </select>
         </div>
       </div>
 
-      <div class="form-group">
+      <!-- Correction 4/5/6 : flags CNSS / IR / AMO -->
+      <div class="section-divider">Bases de calcul</div>
+      <div class="flags-row">
+        <label class="flag-toggle" [class.disabled]="!isGain(form.type)">
+          <input type="checkbox" [(ngModel)]="form.isCnssApplicable" [disabled]="!isGain(form.type)" />
+          <span>Soumis CNSS</span>
+          <small>(cnssApplicable)</small>
+        </label>
+        <label class="flag-toggle" [class.disabled]="!isGain(form.type)">
+          <input type="checkbox" [(ngModel)]="form.isTaxable" [disabled]="!isGain(form.type)" />
+          <span>Soumis IR</span>
+          <small>(taxable)</small>
+        </label>
+        <label class="flag-toggle" [class.disabled]="!isGain(form.type)">
+          <input type="checkbox" [(ngModel)]="form.isAmoApplicable" [disabled]="!isGain(form.type)" />
+          <span>Soumis AMO</span>
+          <small>(amoApplicable)</small>
+        </label>
+      </div>
+      <small class="text-muted" *ngIf="!isGain(form.type)">
+        Les retenues et avances ne sont jamais soumises aux cotisations.
+      </small>
+
+      <div class="form-group" style="margin-top:1rem;">
         <label>Notes</label>
         <input type="text" [(ngModel)]="form.notes" placeholder="Remarques..." />
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" (click)="close()"><i class="bi bi-x-circle"></i> Annuler</button>
-      <button class="btn btn-primary" (click)="save()"><i class="bi bi-check-circle-fill"></i> {{ editing ? 'Enregistrer' : 'Créer' }}</button>
+      <button class="btn btn-primary"   (click)="save()"><i class="bi bi-check-circle-fill"></i> {{ editing ? 'Enregistrer' : 'Créer' }}</button>
     </div>
   </div>
 </div>

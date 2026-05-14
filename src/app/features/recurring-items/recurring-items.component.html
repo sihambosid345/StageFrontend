@@ -24,6 +24,10 @@
             <th>Début</th>
             <th>Fin</th>
             <th>Actif</th>
+            <!-- Correction 4/5/6 : colonnes flags -->
+            <th>CNSS</th>
+            <th>IR</th>
+            <th>AMO</th>
             <th class="text-end">Actions</th>
           </tr>
         </thead>
@@ -34,10 +38,28 @@
             <td>{{ item.label }}</td>
             <td>{{ item.amount ?? (item.percentageValue ? item.percentageValue + '%' : '—') }}</td>
             <td>{{ item.effectiveFrom ? (item.effectiveFrom | date: 'yyyy-MM-dd') : '—' }}</td>
-            <td>{{ item.effectiveTo ? (item.effectiveTo | date: 'yyyy-MM-dd') : '—' }}</td>
+            <td>{{ item.effectiveTo  ? (item.effectiveTo  | date: 'yyyy-MM-dd') : '—' }}</td>
             <td>
               <span class="badge" [ngClass]="item.isActive ? 'bg-success' : 'bg-secondary'">
                 {{ item.isActive ? 'Oui' : 'Non' }}
+              </span>
+            </td>
+            <!-- Correction 4 : CNSS flag -->
+            <td>
+              <span class="badge" [ngClass]="item.isCnssApplicable ? 'bg-primary' : 'bg-light text-muted'">
+                {{ item.isCnssApplicable ? 'Oui' : 'Non' }}
+              </span>
+            </td>
+            <!-- Correction 5 : IR flag -->
+            <td>
+              <span class="badge" [ngClass]="item.isTaxable ? 'bg-warning text-dark' : 'bg-light text-muted'">
+                {{ item.isTaxable ? 'Oui' : 'Non' }}
+              </span>
+            </td>
+            <!-- Correction 6 : AMO flag -->
+            <td>
+              <span class="badge" [ngClass]="item.isAmoApplicable ? 'bg-info' : 'bg-light text-muted'">
+                {{ item.isAmoApplicable ? 'Oui' : 'Non' }}
               </span>
             </td>
             <td class="text-end">
@@ -46,7 +68,7 @@
             </td>
           </tr>
           <tr *ngIf="filtered.length === 0">
-            <td colspan="8" class="text-center text-muted p-3">Aucun élément</td>
+            <td colspan="11" class="text-center text-muted p-3">Aucun élément</td>
           </tr>
         </tbody>
       </table>
@@ -73,7 +95,7 @@
           </select>
         </div>
 
-        <!-- Department & Position Row -->
+        <!-- Department & Position -->
         <div class="row mb-3">
           <div class="col">
             <label class="form-label">Département</label>
@@ -100,7 +122,7 @@
           </select>
         </div>
 
-        <!-- Type & Value Type Row -->
+        <!-- Type & Value Type -->
         <div class="row mb-3">
           <div class="col">
             <label class="form-label">Type <span class="required">*</span></label>
@@ -124,18 +146,17 @@
           <input class="form-control" [(ngModel)]="form.label" placeholder="Ex: Transport mensuel" />
         </div>
 
-        <!-- Amount / Percentage (conditional) -->
+        <!-- Amount / Percentage -->
         <div class="mb-3" *ngIf="form.valueType === 'FIXED'">
           <label class="form-label">Montant</label>
           <input type="number" class="form-control" [(ngModel)]="form.amount" placeholder="0.00" step="0.01" />
         </div>
-
         <div class="mb-3" *ngIf="form.valueType === 'PERCENTAGE'">
           <label class="form-label">Pourcentage (%)</label>
           <input type="number" class="form-control" [(ngModel)]="form.percentageValue" placeholder="0" step="0.01" />
         </div>
 
-        <!-- Date Range Row -->
+        <!-- Date Range -->
         <div class="row mb-3">
           <div class="col">
             <label class="form-label">Date début <span class="required">*</span></label>
@@ -153,13 +174,20 @@
             <input class="form-check-input" type="checkbox" id="chkActive" [(ngModel)]="form.isActive" />
             <label class="form-check-label" for="chkActive">Actif</label>
           </div>
+          <!-- Correction 5 : IR -->
           <div class="form-check">
             <input class="form-check-input" type="checkbox" id="chkTaxable" [(ngModel)]="form.isTaxable" />
-            <label class="form-check-label" for="chkTaxable">Imposable</label>
+            <label class="form-check-label" for="chkTaxable">Soumis IR (imposable)</label>
           </div>
+          <!-- Correction 4 : CNSS -->
           <div class="form-check">
             <input class="form-check-input" type="checkbox" id="chkCnss" [(ngModel)]="form.isCnssApplicable" />
-            <label class="form-check-label" for="chkCnss">CNSS</label>
+            <label class="form-check-label" for="chkCnss">Soumis CNSS</label>
+          </div>
+          <!-- Correction 6 : AMO (nouveau) -->
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="chkAmo" [(ngModel)]="form.isAmoApplicable" />
+            <label class="form-check-label" for="chkAmo">Soumis AMO</label>
           </div>
         </div>
 

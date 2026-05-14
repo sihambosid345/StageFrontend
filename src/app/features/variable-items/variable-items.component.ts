@@ -4,7 +4,15 @@ import { FormsModule } from '@angular/forms';
 import { VariableItemService, EmployeeService, CompanyService } from '../../core/services/domain.services';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
-import { VARIABLE_ITEM_TYPE_OPTIONS, VARIABLE_VALUE_TYPE_OPTIONS, VARIABLE_ITEM_STATUS_OPTIONS, Company } from '../../core/models';
+import {
+  VARIABLE_ITEM_TYPE_OPTIONS,
+  VARIABLE_VALUE_TYPE_OPTIONS,
+  VARIABLE_ITEM_STATUS_OPTIONS,
+  VARIABLE_ITEM_IS_GAIN,   // Correction 13 : mapping centralisé
+  Company,
+  VariableItemType,
+  VariableItemStatus,
+} from '../../core/models';
 
 @Component({
   selector: 'app-variable-items',
@@ -14,40 +22,32 @@ import { VARIABLE_ITEM_TYPE_OPTIONS, VARIABLE_VALUE_TYPE_OPTIONS, VARIABLE_ITEM_
   styleUrls: ['./variable-items.component.scss']
 })
 export class VariableItemsComponent implements OnInit {
-  items: any[] = [];
+  items:    any[] = [];
   filtered: any[] = [];
   employees: any[] = [];
   companies: Company[] = [];
-  periods: any[] = [];
-  loading = true;
+  loading   = true;
   showModal = false;
   showFilterPanel = false;
-  editing = false;
+  editing   = false;
   editingId = '';
-  search = '';
-  companyFilterId = '';
+  search    = '';
+  companyFilterId       = '';
   pendingCompanyFilterId = '';
-  typeFilter = '';
-  pendingTypeFilter = '';
-  statusFilter = '';
-  pendingStatusFilter = '';
+  typeFilter            = '';
+  pendingTypeFilter     = '';
+  statusFilter          = '';
+  pendingStatusFilter   = '';
   error = '';
 
-  readonly typeOptions = VARIABLE_ITEM_TYPE_OPTIONS;
+  readonly typeOptions      = VARIABLE_ITEM_TYPE_OPTIONS;
   readonly valueTypeOptions = VARIABLE_VALUE_TYPE_OPTIONS;
-  readonly statusOptions = VARIABLE_ITEM_STATUS_OPTIONS;
+  readonly statusOptions    = VARIABLE_ITEM_STATUS_OPTIONS;
 
-  form: any = {
-    employeeId: '',
-    type: 'COMMISSION',
-    valueType: 'FIXED',
-    label: '',
-    amount: 0,
-    effectiveDate: '',
-    payrollPeriodId: '',
-    status: 'PENDING',
-    notes: ''
-  };
+  // Correction 10 : APPLIED n'est pas sélectionnable dans le formulaire
+  readonly editableStatuses: VariableItemStatus[] = ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'];
+
+  form: any = this.emptyForm();
 
   constructor(
     private service: VariableItemService,
@@ -61,63 +61,47 @@ export class VariableItemsComponent implements OnInit {
   ngOnInit() {
     this.load();
     this.loadEmployees();
-    if (this.auth.isSuperAdmin()) {
-      this.loadCompanies();
-    }
-    // Auto-refresh every 30 seconds
+    if (this.auth.isSuperAdmin()) { this.loadCompanies(); }
     setInterval(() => {
-      if (!this.showModal && !this.showFilterPanel) {
-        this.load();
-      }
+      if (!this.showModal && !this.showFilterPanel) { this.load(); }
     }, 30000);
   }
 
+  // ── Correction 13 : helper centralisé ────────────────────────────────────
+  isGain(type: string): boolean {
+    return VARIABLE_ITEM_IS_GAIN[type as VariableItemType] ?? true;
+  }
+
   loadEmployees() {
-    this.employeeService.getAll().subscribe({ 
-      next: (d) => { 
-        this.employees = d || []; 
-        this.cdr.detectChanges();
-      }, 
-      error: (err) => {
-        console.error('Error loading employees:', err);
-        this.cdr.detectChanges();
-      } 
+    this.employeeService.getAll().subscribe({
+      next: (d) => { this.employees = d || []; this.cdr.detectChanges(); },
+      error: () => this.cdr.detectChanges()
     });
   }
 
   load() {
     this.loading = true;
-    console.log('🔄 Loading variable items...');
-    
     this.service.getAll().subscribe({
-      next: (data) => { 
-        console.log('✅ Variable items loaded:', data?.length || 0);
-        this.items = data || []; 
-        this.applySearch(); 
+      next: (data) => {
+        this.items = data || [];
+        this.applySearch();
         this.loading = false;
         this.cdr.detectChanges();
       },
-      error: (err) => {
-        console.error('❌ Error loading variable items:', err);
-        this.loading = false;
-        this.items = [];
+      error: () => {
+        this.loading  = false;
+        this.items    = [];
         this.filtered = [];
         this.cdr.detectChanges();
-        this.toastService?.error('Erreur lors du chargement des éléments variables');
+        this.toastService?.error('Erreur lors du chargement');
       }
     });
   }
 
   loadCompanies() {
-    this.companyService.getAll().subscribe({ 
-      next: (data) => { 
-        this.companies = data || []; 
-        this.cdr.detectChanges();
-      },
-      error: (err) => {
-        console.error('Error loading companies:', err);
-        this.cdr.detectChanges();
-      }
+    this.companyService.getAll().subscribe({
+      next: (data) => { this.companies = data || []; this.cdr.detectChanges(); },
+      error: () => this.cdr.detectChanges()
     });
   }
 
@@ -131,156 +115,88 @@ export class VariableItemsComponent implements OnInit {
           i.status?.toLowerCase().includes(q)
         : true;
       const employee = this.employees.find(e => e.id === i.employeeId);
-      const matchesCompany = this.companyFilterId
-        ? employee?.companyId === this.companyFilterId
-        : true;
-      const matchesType = this.typeFilter
-        ? i.type === this.typeFilter
-        : true;
-      const matchesStatus = this.statusFilter
-        ? i.status === this.statusFilter
-        : true;
+      const matchesCompany = this.companyFilterId ? employee?.companyId === this.companyFilterId : true;
+      const matchesType    = this.typeFilter       ? i.type === this.typeFilter     : true;
+      const matchesStatus  = this.statusFilter     ? i.status === this.statusFilter : true;
       return matchesSearch && matchesCompany && matchesType && matchesStatus;
     });
-    console.log(`🔍 Filtered variable items: ${this.filtered.length} / ${this.items.length}`);
     this.cdr.detectChanges();
   }
 
-  onSearch() { 
-    this.applySearch(); 
-  }
+  onSearch() { this.applySearch(); }
 
-  openFilterPanel() {
-    this.pendingCompanyFilterId = this.companyFilterId;
-    this.pendingTypeFilter = this.typeFilter;
-    this.pendingStatusFilter = this.statusFilter;
-    this.showFilterPanel = true;
-  }
-
-  closeFilterPanel() {
-    this.showFilterPanel = false;
-    this.cdr.detectChanges();
-  }
-
-  togglePendingCompanySelection(companyId: string) {
-    this.pendingCompanyFilterId = this.pendingCompanyFilterId === companyId ? '' : companyId;
-    this.cdr.detectChanges();
-  }
-
-  isPendingCompanySelected(companyId: string): boolean {
-    return this.pendingCompanyFilterId === companyId;
-  }
-
-  togglePendingTypeSelection(type: string) {
-    this.pendingTypeFilter = this.pendingTypeFilter === type ? '' : type;
-    this.cdr.detectChanges();
-  }
-
-  isPendingTypeSelected(type: string): boolean {
-    return this.pendingTypeFilter === type;
-  }
-
-  togglePendingStatusSelection(status: string) {
-    this.pendingStatusFilter = this.pendingStatusFilter === status ? '' : status;
-    this.cdr.detectChanges();
-  }
-
-  isPendingStatusSelected(status: string): boolean {
-    return this.pendingStatusFilter === status;
-  }
-
-  applyPendingFilters() {
-    this.companyFilterId = this.pendingCompanyFilterId;
-    this.typeFilter = this.pendingTypeFilter;
-    this.statusFilter = this.pendingStatusFilter;
-    this.showFilterPanel = false;
-    this.applySearch();
-    this.cdr.detectChanges();
-  }
-
-  resetPendingFilters() {
-    this.pendingCompanyFilterId = '';
-    this.pendingTypeFilter = '';
-    this.pendingStatusFilter = '';
-    this.cdr.detectChanges();
-  }
-
-  clearCompanyFilter() {
-    this.companyFilterId = '';
-    this.applySearch();
-    this.cdr.detectChanges();
-  }
-
-  clearTypeFilter() {
-    this.typeFilter = '';
-    this.applySearch();
-    this.cdr.detectChanges();
-  }
-
-  clearStatusFilter() {
-    this.statusFilter = '';
-    this.applySearch();
-    this.cdr.detectChanges();
-  }
+  openFilterPanel()  { this.pendingCompanyFilterId = this.companyFilterId; this.pendingTypeFilter = this.typeFilter; this.pendingStatusFilter = this.statusFilter; this.showFilterPanel = true; }
+  closeFilterPanel() { this.showFilterPanel = false; this.cdr.detectChanges(); }
+  togglePendingCompanySelection(id: string) { this.pendingCompanyFilterId = this.pendingCompanyFilterId === id ? '' : id; }
+  isPendingCompanySelected(id: string)      { return this.pendingCompanyFilterId === id; }
+  togglePendingTypeSelection(t: string)     { this.pendingTypeFilter = this.pendingTypeFilter === t ? '' : t; }
+  isPendingTypeSelected(t: string)          { return this.pendingTypeFilter === t; }
+  togglePendingStatusSelection(s: string)   { this.pendingStatusFilter = this.pendingStatusFilter === s ? '' : s; }
+  isPendingStatusSelected(s: string)        { return this.pendingStatusFilter === s; }
+  applyPendingFilters() { this.companyFilterId = this.pendingCompanyFilterId; this.typeFilter = this.pendingTypeFilter; this.statusFilter = this.pendingStatusFilter; this.showFilterPanel = false; this.applySearch(); }
+  resetPendingFilters() { this.pendingCompanyFilterId = ''; this.pendingTypeFilter = ''; this.pendingStatusFilter = ''; }
+  clearCompanyFilter()  { this.companyFilterId = ''; this.applySearch(); }
+  clearTypeFilter()     { this.typeFilter = ''; this.applySearch(); }
+  clearStatusFilter()   { this.statusFilter = ''; this.applySearch(); }
 
   getEmployeeName(id: string): string {
     const e = this.employees.find(e => e.id === id);
-    return e ? `${e.firstName} ${e.lastName}` : 'Chargement...';
+    return e ? `${e.firstName} ${e.lastName}` : '...';
   }
 
   companyName(id: string): string {
-    const company = this.companies.find(c => c.id === id);
-    return company?.name ?? '—';
+    return this.companies.find(c => c.id === id)?.name ?? '—';
   }
 
-  get isSuperAdmin(): boolean {
-    return this.auth.isSuperAdmin();
-  }
-
-  getPeriodLabel(id: string): string {
-    const p = this.periods.find(p => p.id === id);
-    return p ? `${p.month}/${p.year}` : '—';
-  }
+  get isSuperAdmin(): boolean { return this.auth.isSuperAdmin(); }
 
   emptyForm() {
     const today = new Date().toISOString().slice(0, 10);
     return {
-      employeeId: '', 
-      type: 'COMMISSION', 
-      valueType: 'FIXED',
-      label: '', 
-      amount: 0,
-      effectiveDate: today,
-      payrollPeriodId: '', 
-      status: 'PENDING', 
-      notes: ''
+      employeeId:      '',
+      type:            'COMMISSION',
+      valueType:       'FIXED',
+      label:           '',
+      amount:          0,
+      effectiveDate:   today,
+      payrollPeriodId: '',
+      status:          'PENDING',
+      notes:           '',
+      // Correction 4/5/6 : flags par défaut
+      isCnssApplicable: false,
+      isTaxable:        false,
+      isAmoApplicable:  false,
     };
   }
 
   openCreate() {
-    this.form = this.emptyForm();
-    this.editing = false; 
-    this.editingId = ''; 
-    this.error = '';
+    this.form      = this.emptyForm();
+    this.editing   = false;
+    this.editingId = '';
+    this.error     = '';
     this.showModal = true;
     this.cdr.detectChanges();
   }
 
   openEdit(item: any) {
     this.form = {
-      employeeId: item.employeeId,
-      type: item.type,
-      valueType: item.valueType ?? 'FIXED',
-      label: item.label,
-      amount: item.amount,
-      effectiveDate: item.effectiveDate?.slice(0, 10),
-      payrollPeriodId: item.payrollPeriodId ?? '',
-      status: item.status,
-      notes: item.notes ?? ''
+      employeeId:       item.employeeId,
+      type:             item.type,
+      valueType:        item.valueType ?? 'FIXED',
+      label:            item.label,
+      amount:           item.amount,
+      effectiveDate:    item.effectiveDate?.slice(0, 10),
+      payrollPeriodId:  item.payrollPeriodId ?? '',
+      // Correction 10 : si APPLIED, afficher APPROVED pour permettre modification
+      status:           item.status === 'APPLIED' ? 'APPROVED' : item.status,
+      notes:            item.notes ?? '',
+      isCnssApplicable: item.isCnssApplicable ?? false,
+      isTaxable:        item.isTaxable ?? false,
+      isAmoApplicable:  item.isAmoApplicable ?? false,
     };
-    this.editing = true; 
-    this.editingId = item.id; 
-    this.error = '';
+    this.editing   = true;
+    this.editingId = item.id;
+    this.error     = '';
     this.showModal = true;
     this.cdr.detectChanges();
   }
@@ -291,90 +207,68 @@ export class VariableItemsComponent implements OnInit {
       this.cdr.detectChanges();
       return;
     }
-    
-    const loadingId = this.toastService?.loading('Sauvegarde en cours...');
-    
-    const payload: any = {
-      employeeId: this.form.employeeId,
-      type: this.form.type,
-      valueType: this.form.valueType,
-      label: this.form.label,
-      amount: +this.form.amount,
-      effectiveDate: this.form.effectiveDate,
-      status: this.form.status,
-    };
-    
-    if (this.form.payrollPeriodId) payload.payrollPeriodId = this.form.payrollPeriodId;
-    if (this.form.notes) payload.notes = this.form.notes;
 
+    const gain = this.isGain(this.form.type);
+
+    const payload: any = {
+      employeeId:       this.form.employeeId,
+      type:             this.form.type,
+      valueType:        this.form.valueType,
+      label:            this.form.label,
+      amount:           +this.form.amount,
+      effectiveDate:    this.form.effectiveDate,
+      status:           this.form.status,
+      // Correction 4/5/6 : flags
+      isCnssApplicable: gain ? !!this.form.isCnssApplicable : false,
+      isTaxable:        gain ? !!this.form.isTaxable        : false,
+      isAmoApplicable:  gain ? !!this.form.isAmoApplicable  : false,
+    };
+    if (this.form.payrollPeriodId) payload.payrollPeriodId = this.form.payrollPeriodId;
+    if (this.form.notes)           payload.notes           = this.form.notes;
+
+    const loadingId = this.toastService?.loading('Sauvegarde en cours...');
     const obs = this.editing
       ? this.service.update(this.editingId, payload)
       : this.service.create(payload);
-      
+
     obs.subscribe({
-      next: () => { 
-        this.showModal = false; 
+      next: () => {
+        this.showModal = false;
         this.load();
         this.cdr.detectChanges();
-        if (this.toastService) {
-          this.toastService.update(loadingId, this.editing ? 'Élément variable modifié avec succès' : 'Élément variable créé avec succès', 'success', 4000);
-        }
+        this.toastService?.update(loadingId, this.editing ? 'Modifié avec succès' : 'Créé avec succès', 'success', 4000);
       },
-      error: (e) => { 
-        this.error = e?.error?.error || 'Erreur serveur';
+      error: (e) => {
+        this.error = e?.error?.error || e?.error?.message || 'Erreur serveur';
         this.cdr.detectChanges();
-        if (this.toastService) {
-          this.toastService.update(loadingId, this.error, 'error', 4000);
-        }
+        this.toastService?.update(loadingId, this.error, 'error', 4000);
       }
     });
   }
 
   delete(id: string) {
     if (!confirm('Supprimer cet élément variable ?')) return;
-    
     this.service.delete(id).subscribe({
-      next: () => {
-        this.load();
-        this.toastService?.success('Élément variable supprimé avec succès');
-        this.cdr.detectChanges();
-      },
-      error: (err) => {
-        console.error('Delete error:', err);
-        this.toastService?.error(err?.error?.error || 'Erreur lors de la suppression');
-        this.cdr.detectChanges();
-      }
+      next: () => { this.load(); this.toastService?.success('Supprimé avec succès'); this.cdr.detectChanges(); },
+      error: (e) => { this.toastService?.error(e?.error?.error || 'Erreur lors de la suppression'); this.cdr.detectChanges(); }
     });
   }
 
-  close() { 
-    this.showModal = false; 
-    this.cdr.detectChanges();
-  }
+  close() { this.showModal = false; this.cdr.detectChanges(); }
 
   typeClass(t: string): string {
-    const m: any = { 
-      COMMISSION: 'badge-info', 
-      FRAIS: 'badge-warning',
-      AVANCE: 'badge-orange',
-      RETENUE: 'badge-danger',
-      PRIME: 'badge-success',
-      DEDUCTION: 'badge-danger',
-      ADVANCE: 'badge-orange',
-      BONUS: 'badge-success',
-      OVERTIME: 'badge-purple', 
-      OTHER: 'badge-secondary' 
+    const m: any = {
+      COMMISSION: 'badge-info',    FRAIS:   'badge-warning',
+      AVANCE:     'badge-orange',  RETENUE: 'badge-danger',
+      PRIME:      'badge-success',
     };
     return m[t] ?? 'badge-secondary';
   }
 
   statusClass(s: string): string {
-    const m: any = { 
-      PENDING: 'badge-warning', 
-      APPROVED: 'badge-success', 
-      REJECTED: 'badge-danger', 
-      APPLIED: 'badge-info', 
-      CANCELLED: 'badge-secondary' 
+    const m: any = {
+      PENDING: 'badge-warning', APPROVED: 'badge-success',
+      REJECTED: 'badge-danger', APPLIED: 'badge-info', CANCELLED: 'badge-secondary'
     };
     return m[s] ?? 'badge-secondary';
   }

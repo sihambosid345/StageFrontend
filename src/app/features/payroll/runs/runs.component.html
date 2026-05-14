@@ -11,11 +11,22 @@
       <input type="text" placeholder="Rechercher..." [(ngModel)]="search" (input)="onSearch()" />
     </div>
   </div>
+
   <div *ngIf="loading" class="loading-spinner"></div>
+
   <div class="table-scroll" *ngIf="!loading">
     <table *ngIf="filtered.length > 0">
       <thead>
-        <tr><th>Période</th><th>N° Exécution</th><th>Statut</th><th>Employés</th><th>Total brut</th><th>Total net</th><th>Actions</th></tr>
+        <tr>
+          <th>Période</th>
+          <th>N° Run</th>
+          <th>Statut</th>
+          <th>Employés</th>
+          <th>Total brut</th>
+          <th>Total net</th>
+          <th>Charges patronales</th>
+          <th>Actions</th>
+        </tr>
       </thead>
       <tbody>
         <tr *ngFor="let item of filtered">
@@ -24,11 +35,22 @@
           <td><span class="badge" [ngClass]="statusClass(item.status)">{{ item.status }}</span></td>
           <td>{{ item.totalEmployees ?? 0 }}</td>
           <td class="amount-cell">{{ item.totalGross | number:'1.2-2' }} MAD</td>
-          <td class="amount-cell">{{ item.totalNet | number:'1.2-2' }} MAD</td>
+          <td class="amount-cell text-success"><strong>{{ item.totalNet | number:'1.2-2' }} MAD</strong></td>
+          <!-- Correction 12 : afficher charges patronales -->
+          <td class="amount-cell text-muted">{{ (item.totalEmployerCharges ?? 0) | number:'1.2-2' }} MAD</td>
           <td>
             <div class="actions">
-              <button class="btn btn-icon btn-secondary" (click)="openEdit(item)"><i class="bi bi-pencil"></i></button>
-              <button class="btn btn-icon btn-danger" (click)="delete(item.id)"><i class="bi bi-trash"></i></button>
+              <!-- Correction 7 : bouton Calculer -->
+              <button
+                class="btn btn-icon btn-success"
+                (click)="calculate(item)"
+                [disabled]="isCalculating(item.id) || item.status === 'COMPLETED'"
+                [title]="item.status === 'COMPLETED' ? 'Run terminé' : 'Lancer le calcul de paie'"
+              >
+                <i class="bi" [ngClass]="isCalculating(item.id) ? 'bi-hourglass-split' : 'bi-calculator'"></i>
+              </button>
+              <button class="btn btn-icon btn-secondary" (click)="openEdit(item)" [disabled]="item.status === 'COMPLETED'" title="Modifier"><i class="bi bi-pencil"></i></button>
+              <button class="btn btn-icon btn-danger" (click)="delete(item.id)" [disabled]="item.status === 'COMPLETED'" title="Supprimer"><i class="bi bi-trash"></i></button>
             </div>
           </td>
         </tr>
@@ -41,6 +63,7 @@
   </div>
 </div>
 
+<!-- Modal création/édition -->
 <div class="modal-overlay" *ngIf="showModal" (click)="close()">
   <div class="modal" (click)="$event.stopPropagation()">
     <div class="modal-header">
@@ -79,6 +102,88 @@
     <div class="modal-footer">
       <button class="btn btn-secondary" (click)="close()"><i class="bi bi-x-circle"></i> Annuler</button>
       <button class="btn btn-primary" (click)="save()"><i class="bi bi-check-circle-fill"></i> {{ editing ? 'Enregistrer' : 'Créer' }}</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal résultat calcul (Correction 7 & 12) -->
+<div class="modal-overlay" *ngIf="showResultModal && lastResult" (click)="closeResultModal()">
+  <div class="modal modal-lg" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3><i class="bi bi-calculator-fill" style="color:var(--accent);"></i> Résultat du calcul de paie</h3>
+      <button class="btn btn-icon btn-secondary" (click)="closeResultModal()"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Résumé global -->
+      <div class="result-summary-grid">
+        <div class="result-card">
+          <div class="result-label">Employés traités</div>
+          <div class="result-value">{{ lastResult!.processed }} / {{ lastResult!.totalEmployees }}</div>
+        </div>
+        <div class="result-card" *ngIf="lastResult!.errors > 0">
+          <div class="result-label text-danger">Erreurs</div>
+          <div class="result-value text-danger">{{ lastResult!.errors }}</div>
+        </div>
+        <!-- Correction 12 : bases distinctes dans le résumé -->
+        <div class="result-card">
+          <div class="result-label">Total brut</div>
+          <div class="result-value">{{ lastResult!.totalGross | number:'1.2-2' }} MAD</div>
+        </div>
+        <div class="result-card">
+          <div class="result-label">Total net</div>
+          <div class="result-value text-success">{{ lastResult!.totalNet | number:'1.2-2' }} MAD</div>
+        </div>
+        <div class="result-card">
+          <div class="result-label">Total déductions</div>
+          <div class="result-value text-danger">{{ lastResult!.totalDeductions | number:'1.2-2' }} MAD</div>
+        </div>
+        <div class="result-card">
+          <div class="result-label">Charges patronales</div>
+          <div class="result-value text-muted">{{ lastResult!.totalErCharges | number:'1.2-2' }} MAD</div>
+        </div>
+      </div>
+
+      <!-- Détail par employé -->
+      <div class="section-divider">Détail par employé</div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Employé</th>
+              <th>Brut</th>
+              <th>Base CNSS</th>  <!-- Correction 4 -->
+              <th>Base AMO</th>   <!-- Correction 6 -->
+              <th>Base IR</th>    <!-- Correction 5 -->
+              <th>CNSS sal.</th>
+              <th>AMO sal.</th>
+              <th>IR</th>
+              <th>Net</th>
+              <th>Statut</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let r of lastResult!.results" [class.row-error]="r.error">
+              <td>{{ r.employeeName }}</td>
+              <td class="amount-cell">{{ r.grossSalary  | number:'1.2-2' }}</td>
+              <td class="amount-cell">{{ r.cnssGross    | number:'1.2-2' }}</td>
+              <td class="amount-cell">{{ r.amoGross     | number:'1.2-2' }}</td>
+              <td class="amount-cell">{{ r.taxableGross | number:'1.2-2' }}</td>
+              <td class="amount-cell text-danger">{{ r.cnssEmpAmount | number:'1.2-2' }}</td>
+              <td class="amount-cell text-danger">{{ r.amoEmpAmount  | number:'1.2-2' }}</td>
+              <td class="amount-cell text-danger">{{ r.irAmount      | number:'1.2-2' }}</td>
+              <td class="amount-cell text-success"><strong>{{ r.netSalary | number:'1.2-2' }}</strong></td>
+              <td>
+                <span *ngIf="!r.error" class="badge badge-success">OK</span>
+                <span *ngIf="r.error"  class="badge badge-danger" [title]="r.error">Erreur</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" (click)="closeResultModal()"><i class="bi bi-check-circle"></i> Fermer</button>
     </div>
   </div>
 </div>

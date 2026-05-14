@@ -5,7 +5,8 @@ import { Observable } from 'rxjs';
 import {
   Company, Department, Position, Employee, Attendance,
   EmployeeContract, License, PayrollPeriod, PayrollRun,
-  PayrollItem, Payslip, VariableItem, EmployeeRecurringItem, User
+  PayrollItem, Payslip, VariableItem, EmployeeRecurringItem, User,
+  PayrollRunResult, StatutoryRate, TaxBracket
 } from '../models';
 
 // ── Interfaces pour le super admin ──────────────────────────────────────────
@@ -339,6 +340,45 @@ export class PayslipService {
   
   delete(id: string): Observable<any> {
     return this.api.delete(`/payslips/${id}`);
+  }
+}
+
+// ── Service Moteur de Paie (Payroll Calculation) ────────────────────────────
+
+/**
+ * Service pour lancer le moteur de paie
+ * Correction 7 : Transaction globale Prisma au backend
+ */
+@Injectable({ providedIn: 'root' })
+export class PayrollCalculationService {
+  constructor(private api: ApiService) {}
+
+  /**
+   * Lance le calcul de paie pour un PayrollRun.
+   * POST /api/payroll-calculation/run/:runId
+   * Retourne le résultat du calcul avec totalEmployees, processed, errors, totaux.
+   */
+  calculate(runId: string): Observable<PayrollRunResult> {
+    return this.api.post(`/payroll-calculation/run/${runId}`, {});
+  }
+
+  /**
+   * Récupère les taux statutaires actifs.
+   * GET /api/payroll-calculation/rates?companyId=...
+   */
+  getRates(companyId?: string): Observable<StatutoryRate[]> {
+    return this.api.get('/payroll-calculation/rates', { params: { companyId } });
+  }
+
+  /**
+   * Récupère le barème IR actif.
+   * GET /api/payroll-calculation/brackets?companyId=...&taxCode=...&effectiveDate=...
+   */
+  getTaxBrackets(companyId?: string, taxCode: string = 'IR_SALAIRE', effectiveDate?: string): Observable<TaxBracket[]> {
+    const params: any = { taxCode };
+    if (companyId) params.companyId = companyId;
+    if (effectiveDate) params.effectiveDate = effectiveDate;
+    return this.api.get('/payroll-calculation/brackets', { params });
   }
 }
 
