@@ -117,6 +117,10 @@ export class PayrollService {
     return this.http.put<StatutoryRate>(`${this.api}/payroll/statutory-rates/${id}`, rate);
   }
 
+  deleteStatutoryRate(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.api}/payroll/statutory-rates/${id}`);
+  }
+
   // ─── TAX BRACKETS ──────────────────────────────────────────────────────────
 
   getTaxBrackets(code: string = 'IR_SALAIRE', date?: string): Observable<TaxBracket[]> {
