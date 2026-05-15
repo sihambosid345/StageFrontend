@@ -1,218 +1,402 @@
-import { Component, OnInit, ChangeDetectorRef, NgZone } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { PayrollRunService, PayrollPeriodService, PayrollCalculationService } from '../../../core/services/domain.services';
-import { AuthService } from '../../../core/services/auth.service';
-import { ToastService } from '../../../core/services/toast.service';
-import { PAYROLL_RUN_STATUS_OPTIONS, PayrollRunResult } from '../../../core/models';
+import { RouterModule, Router } from '@angular/router';
+import { Subject, takeUntil } from 'rxjs';
+import { PayrollService, PayrollRun, TaxBracket, StatutoryRate } from '../services/payroll.service';
+import { PayrollConfigWarningComponent } from './payroll-config-warning/payroll-config-warning.component';
 
 @Component({
-  selector: 'app-runs',
+  selector: 'app-payroll-runs',
   standalone: true,
-  imports: [CommonModule, FormsModule],
-  templateUrl: './runs.component.html',
-  styleUrls: ['./runs.component.scss']
+  imports: [CommonModule, RouterModule, PayrollConfigWarningComponent],
+  template: `
+    <div class="page-container">
+      <!-- En-tête -->
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Exécutions de paie</h1>
+          <p class="page-subtitle">Gestion des exécutions de paie</p>
+        </div>
+        <button class="btn-primary" (click)="openCreateDialog()">
+          <span class="btn-icon">+</span> Ajouter
+        </button>
+      </div>
+
+      <!-- Alerte configuration manquante -->
+      <app-payroll-config-warning
+        [missingRates]="missingRates"
+        [missingBrackets]="missingBrackets"
+        [configDate]="todayStr"
+        (dismissed)="dismissWarning()">
+      </app-payroll-config-warning>
+
+      <!-- Table -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Exécutions de paie</span>
+          <div class="search-box">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+            <input type="text" placeholder="Rechercher..." [(ngModel)]="searchTerm" (input)="applyFilter()">
+          </div>
+        </div>
+
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>PÉRIODE</th>
+                <th>N° RUN</th>
+                <th>STATUT</th>
+                <th>EMPLOYÉS</th>
+                <th>TOTAL BRUT</th>
+                <th>TOTAL NET</th>
+                <th>CHARGES PATRONALES</th>
+                <th>ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngIf="loading">
+                <td colspan="8" class="loading-cell">
+                  <div class="spinner"></div> Chargement...
+                </td>
+              </tr>
+              <tr *ngIf="!loading && filteredRuns.length === 0">
+                <td colspan="8" class="empty-cell">Aucune exécution trouvée</td>
+              </tr>
+              <tr *ngFor="let run of filteredRuns" class="table-row">
+                <td>{{ formatPeriod(run.period) }}</td>
+                <td>#{{ run.runNumber }}</td>
+                <td>
+                  <span class="badge" [ngClass]="getStatusClass(run.status)">
+                    {{ run.status }}
+                  </span>
+                </td>
+                <td>{{ run.employeeCount }}</td>
+                <td>{{ run.totalGross | number:'1.2-2' }} MAD</td>
+                <td class="net-amount">{{ run.totalNet | number:'1.2-2' }} MAD</td>
+                <td>{{ run.employerContributions | number:'1.2-2' }} MAD</td>
+                <td class="actions-cell">
+                  <!-- Calculer / Voir détail -->
+                  <button
+                    class="action-btn btn-calculate"
+                    [title]="run.status === 'COMPLETED' ? 'Voir les bulletins' : 'Calculer'"
+                    (click)="handlePrimary(run)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="4" y="2" width="16" height="20" rx="2"/>
+                      <line x1="8" y1="7" x2="16" y2="7"/>
+                      <line x1="8" y1="12" x2="16" y2="12"/>
+                      <line x1="8" y1="17" x2="12" y2="17"/>
+                    </svg>
+                  </button>
+                  <!-- Éditer -->
+                  <button
+                    class="action-btn btn-edit"
+                    title="Modifier"
+                    [disabled]="run.status === 'LOCKED'"
+                    (click)="editRun(run)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                  </button>
+                  <!-- Supprimer -->
+                  <button
+                    class="action-btn btn-delete"
+                    title="Supprimer"
+                    [disabled]="run.status === 'LOCKED' || run.status === 'COMPLETED'"
+                    (click)="deleteRun(run)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="3 6 5 6 21 6"/>
+                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                      <path d="M10 11v6M14 11v6"/>
+                      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                    </svg>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal créer run -->
+    <div class="modal-overlay" *ngIf="showCreateModal" (click)="closeCreateDialog()">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>Nouvelle exécution de paie</h2>
+          <button class="modal-close" (click)="closeCreateDialog()">✕</button>
+        </div>
+        <div class="modal-body">
+          <label>Période (mois/année)</label>
+          <input type="month" [(ngModel)]="newPeriod" class="form-input">
+          <p class="hint" *ngIf="!configLoaded">
+            ⚠️ Vérifiez que les taux légaux et le barème IR sont configurés pour cette période.
+          </p>
+          <p class="hint success" *ngIf="configLoaded && missingRates.length === 0 && missingBrackets.length === 0">
+            ✅ Configuration de paie vérifiée pour la période sélectionnée.
+          </p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" (click)="closeCreateDialog()">Annuler</button>
+          <button class="btn-primary" [disabled]="!newPeriod || creating" (click)="createRun()">
+            {{ creating ? 'Création...' : 'Créer' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  `,
+  styles: [`
+    .page-container { padding: 24px; }
+
+    .page-header {
+      display: flex; align-items: flex-start;
+      justify-content: space-between; margin-bottom: 24px;
+    }
+    .page-title { font-size: 24px; font-weight: 700; color: #1a1a2e; margin: 0; }
+    .page-subtitle { font-size: 13px; color: #6b7280; margin: 4px 0 0; }
+
+    .btn-primary {
+      display: flex; align-items: center; gap: 6px;
+      background: #4f46e5; color: white; border: none;
+      padding: 10px 20px; border-radius: 8px; font-size: 14px;
+      font-weight: 600; cursor: pointer; transition: background 0.2s;
+    }
+    .btn-primary:hover { background: #4338ca; }
+    .btn-primary:disabled { background: #9ca3af; cursor: not-allowed; }
+    .btn-secondary {
+      background: white; color: #374151; border: 1px solid #d1d5db;
+      padding: 10px 20px; border-radius: 8px; font-size: 14px;
+      font-weight: 600; cursor: pointer;
+    }
+    .btn-icon { font-size: 18px; line-height: 1; }
+
+    .card {
+      background: white; border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden;
+    }
+    .card-header {
+      display: flex; align-items: center;
+      justify-content: space-between; padding: 20px 24px;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .card-title { font-size: 16px; font-weight: 600; color: #111827; }
+
+    .search-box {
+      display: flex; align-items: center; gap: 8px;
+      background: #f9fafb; border: 1px solid #e5e7eb;
+      border-radius: 8px; padding: 8px 12px; width: 280px;
+    }
+    .search-box input {
+      border: none; background: none; outline: none;
+      font-size: 14px; color: #374151; width: 100%;
+    }
+
+    .table-wrapper { overflow-x: auto; }
+    .data-table { width: 100%; border-collapse: collapse; }
+    .data-table th {
+      background: #f9fafb; padding: 12px 16px;
+      text-align: left; font-size: 11px; font-weight: 600;
+      color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .data-table td {
+      padding: 14px 16px; font-size: 14px; color: #374151;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .table-row:hover { background: #f9fafb; }
+    .net-amount { color: #059669; font-weight: 600; }
+
+    .loading-cell, .empty-cell {
+      text-align: center; padding: 40px !important; color: #9ca3af;
+    }
+    .spinner {
+      display: inline-block; width: 16px; height: 16px;
+      border: 2px solid #e5e7eb; border-top-color: #4f46e5;
+      border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .badge {
+      display: inline-flex; align-items: center;
+      padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600;
+    }
+    .badge-draft { background: #f3f4f6; color: #374151; }
+    .badge-processing { background: #fef3c7; color: #92400e; }
+    .badge-completed { background: #d1fae5; color: #065f46; }
+    .badge-locked { background: #ede9fe; color: #5b21b6; }
+    .badge-error { background: #fee2e2; color: #991b1b; }
+
+    .actions-cell { display: flex; gap: 8px; align-items: center; }
+    .action-btn {
+      width: 34px; height: 34px; border-radius: 8px;
+      border: none; cursor: pointer; display: flex;
+      align-items: center; justify-content: center; transition: all 0.2s;
+    }
+    .action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-calculate { background: #d1fae5; color: #065f46; }
+    .btn-calculate:hover:not(:disabled) { background: #a7f3d0; }
+    .btn-edit { background: #f3f4f6; color: #374151; }
+    .btn-edit:hover:not(:disabled) { background: #e5e7eb; }
+    .btn-delete { background: #fee2e2; color: #991b1b; }
+    .btn-delete:hover:not(:disabled) { background: #fecaca; }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+      display: flex; align-items: center; justify-content: center; z-index: 1000;
+    }
+    .modal {
+      background: white; border-radius: 12px;
+      width: 480px; box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+    .modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 20px 24px; border-bottom: 1px solid #f3f4f6;
+    }
+    .modal-header h2 { font-size: 18px; font-weight: 700; margin: 0; }
+    .modal-close { background: none; border: none; font-size: 18px; cursor: pointer; color: #6b7280; }
+    .modal-body { padding: 24px; }
+    .modal-body label { display: block; font-size: 14px; font-weight: 500; color: #374151; margin-bottom: 6px; }
+    .form-input {
+      width: 100%; padding: 10px 12px; border: 1px solid #d1d5db;
+      border-radius: 8px; font-size: 14px; outline: none; box-sizing: border-box;
+    }
+    .form-input:focus { border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,0.1); }
+    .hint { font-size: 13px; color: #92400e; background: #fef3c7; padding: 8px 12px; border-radius: 6px; margin-top: 12px; }
+    .hint.success { color: #065f46; background: #d1fae5; }
+    .modal-footer { display: flex; gap: 12px; justify-content: flex-end; padding: 20px 24px; border-top: 1px solid #f3f4f6; }
+  `]
 })
-export class RunsComponent implements OnInit {
-  items:    any[] = [];
-  filtered: any[] = [];
-  periods:  any[] = [];
-  loading   = true;
-  showModal = false;
-  editing   = false;
-  editingId = '';
-  search    = '';
-  error     = '';
+export class PayrollRunsComponent implements OnInit, OnDestroy {
+  runs: PayrollRun[] = [];
+  filteredRuns: PayrollRun[] = [];
+  loading = false;
+  searchTerm = '';
+  showCreateModal = false;
+  newPeriod = '';
+  creating = false;
+  configLoaded = false;
 
-  // Correction 7 : résultat du calcul moteur
-  calculatingRunId: string | null = null;
-  lastResult: PayrollRunResult | null = null;
-  showResultModal = false;
+  missingRates: string[] = [];
+  missingBrackets: TaxBracket[] = [];
+  todayStr = new Date().toISOString().split('T')[0];
 
-  readonly statusOptions = PAYROLL_RUN_STATUS_OPTIONS;
+  private destroy$ = new Subject<void>();
 
-  form: any = {
-    payrollPeriodId: '',
-    status: 'DRAFT',
-    runNumber: 1,
-    notes: ''
-  };
+  constructor(private payrollSvc: PayrollService, private router: Router) {}
 
-  constructor(
-    private service: PayrollRunService,
-    private periodService: PayrollPeriodService,
-    private calculationService: PayrollCalculationService,
-    private auth: AuthService,
-    private toast: ToastService,
-    private cdr: ChangeDetectorRef,
-    private ngZone: NgZone
-  ) {}
-
-  ngOnInit() {
-    requestAnimationFrame(() => {
-      this.load();
-      this.periodService.getAll().subscribe({
-        next: (d) => this.ngZone.run(() => { this.periods = d; this.cdr.detectChanges(); }),
-        error: () => {}
-      });
-    });
+  ngOnInit(): void {
+    this.loadRuns();
+    this.checkPayrollConfig();
   }
 
-  load() {
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
+  loadRuns(): void {
     this.loading = true;
-    this.service.getAll().subscribe({
-      next: (data) => this.ngZone.run(() => {
-        this.items = data;
-        this.applySearch();
-        this.loading = false;
-        this.cdr.detectChanges();
-      }),
-      error: () => this.ngZone.run(() => { this.loading = false; this.cdr.detectChanges(); })
-    });
+    this.payrollSvc.getPayrollRuns()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (runs) => { this.runs = runs; this.filteredRuns = runs; this.loading = false; },
+        error: () => { this.loading = false; }
+      });
   }
 
-  applySearch() {
-    const q = this.search.toLowerCase();
-    this.filtered = q
-      ? this.items.filter(i =>
-          this.getPeriodLabel(i.payrollPeriodId).toLowerCase().includes(q) ||
-          i.status?.toLowerCase().includes(q)
-        )
-      : [...this.items];
-    this.cdr.markForCheck();
+  checkPayrollConfig(): void {
+    const today = this.todayStr;
+    this.payrollSvc.loadPayrollConfig(today)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: ({ rates, brackets }) => {
+          this.configLoaded = true;
+          const requiredCodes = ['CNSS_EMPLOYEE', 'CNSS_EMPLOYER', 'AMO_EMPLOYEE', 'AMO_EMPLOYER'];
+          const foundCodes = rates.filter(r => r.isActive).map(r => r.code);
+          this.missingRates = requiredCodes.filter(c => !foundCodes.includes(c));
+          this.missingBrackets = brackets.filter(b => b.isActive).length === 0 ? [] : [];
+          // Si aucun barème IR actif → avertissement
+          if (brackets.filter(b => b.isActive).length === 0) {
+            this.missingBrackets = [{ code: 'IR_SALAIRE' } as TaxBracket];
+          }
+        },
+        error: () => {
+          // API injoignable, on n'affiche pas d'erreur bloquante
+          this.configLoaded = false;
+        }
+      });
   }
 
-  onSearch() { this.applySearch(); }
-
-  getPeriodLabel(id: string): string {
-    const p = this.periods.find(p => p.id === id);
-    return p ? `${p.month}/${p.year}` : id;
+  applyFilter(): void {
+    const term = this.searchTerm.toLowerCase();
+    this.filteredRuns = this.runs.filter(r =>
+      r.period.includes(term) || `#${r.runNumber}`.includes(term) || r.status.toLowerCase().includes(term)
+    );
   }
 
-  openCreate() {
-    this.form     = { payrollPeriodId: '', status: 'DRAFT', runNumber: 1, notes: '' };
-    this.editing  = false;
-    this.editingId = '';
-    this.error    = '';
-    this.showModal = true;
+  formatPeriod(period: string): string {
+    const [year, month] = period.split('-');
+    return `${month}/${year}`;
   }
 
-  openEdit(item: any) {
-    // Correction 8 : interdire l'édition d'un run COMPLETED
-    if (item.status === 'COMPLETED') {
-      this.toast.error('Ce run est terminé. Créez un nouveau run pour recalculer.');
-      return;
-    }
-    this.form = {
-      payrollPeriodId: item.payrollPeriodId,
-      status:    item.status,
-      runNumber: item.runNumber ?? 1,
-      notes:     item.notes ?? ''
+  getStatusClass(status: string): string {
+    const map: Record<string, string> = {
+      DRAFT: 'badge-draft', PROCESSING: 'badge-processing',
+      COMPLETED: 'badge-completed', LOCKED: 'badge-locked', ERROR: 'badge-error'
     };
-    this.editing   = true;
-    this.editingId = item.id;
-    this.error     = '';
-    this.showModal = true;
+    return map[status] || 'badge-draft';
   }
 
-  save() {
-    if (!this.form.payrollPeriodId) {
-      this.error = 'La période de paie est obligatoire.';
-      return;
+  handlePrimary(run: PayrollRun): void {
+    if (run.status === 'DRAFT') {
+      this.router.navigate(['/payroll/runs', run.id, 'calculate']);
+    } else {
+      this.router.navigate(['/payroll/runs', run.id, 'payslips']);
     }
-    const selectedPeriod = this.periods.find(p => p.id === this.form.payrollPeriodId);
-    if (!selectedPeriod?.companyId) {
-      this.error = 'Période invalide ou sans entreprise associée.';
-      return;
-    }
-
-    const payload: any = {
-      companyId:       selectedPeriod.companyId,
-      payrollPeriodId: this.form.payrollPeriodId,
-      status:          this.form.status,
-      runNumber:       +this.form.runNumber || 1,
-    };
-    if (this.form.notes) payload.notes = this.form.notes;
-
-    const obs = this.editing
-      ? this.service.update(this.editingId, payload)
-      : this.service.create(payload);
-
-    obs.subscribe({
-      next: () => this.ngZone.run(() => { this.showModal = false; this.load(); }),
-      error: (e) => this.ngZone.run(() => {
-        this.error = e?.error?.error || 'Erreur serveur';
-        this.cdr.detectChanges();
-      })
-    });
   }
 
-  // ── Correction 7 : lancer le moteur de paie ──────────────────────────────
-  /**
-   * Déclenche POST /payroll-calculation/run/:id
-   * Le backend exécute tout dans une transaction Prisma.
-   */
-  calculate(item: any) {
-    // Correction 8 : bloquer si déjà COMPLETED
-    if (item.status === 'COMPLETED') {
-      this.toast.error('Ce run est déjà terminé. Créez un nouveau run pour recalculer.');
-      return;
-    }
-    if (!confirm(`Lancer le calcul de paie pour le run #${item.runNumber} ?`)) return;
-
-    this.calculatingRunId = item.id;
-    const toastId = this.toast.loading('Calcul en cours...');
-    this.cdr.detectChanges();
-
-    this.calculationService.calculate(item.id).subscribe({
-      next: (result) => this.ngZone.run(() => {
-        this.calculatingRunId = null;
-        this.lastResult       = result;
-        this.showResultModal  = true;
-        this.load(); // rafraîchir les totaux
-
-        const msg = `Calcul terminé : ${result.processed}/${result.totalEmployees} employé(s)${result.errors > 0 ? ` — ${result.errors} erreur(s)` : ''}`;
-        this.toast.update(toastId, msg, result.errors > 0 ? 'warning' : 'success', 6000);
-        this.cdr.detectChanges();
-      }),
-      error: (e) => this.ngZone.run(() => {
-        this.calculatingRunId = null;
-        const msg = e?.error?.message || e?.error?.error || 'Erreur lors du calcul';
-        this.toast.update(toastId, msg, 'error', 6000);
-        this.cdr.detectChanges();
-      })
-    });
+  editRun(run: PayrollRun): void {
+    this.router.navigate(['/payroll/runs', run.id, 'edit']);
   }
 
-  closeResultModal() {
-    this.showResultModal = false;
-    this.lastResult      = null;
-    this.cdr.detectChanges();
+  deleteRun(run: PayrollRun): void {
+    if (!confirm(`Supprimer l'exécution #${run.runNumber} ?`)) return;
+    this.payrollSvc.deletePayrollRun(run.id)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => this.loadRuns());
   }
 
-  delete(id: string) {
-    const item = this.items.find(i => i.id === id);
-    if (item?.status === 'COMPLETED') {
-      this.toast.error('Impossible de supprimer un run terminé.');
-      return;
-    }
-    if (!confirm('Supprimer cette exécution ?')) return;
-    this.service.delete(id).subscribe(() => this.ngZone.run(() => this.load()));
+  openCreateDialog(): void {
+    const now = new Date();
+    this.newPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    this.showCreateModal = true;
   }
 
-  close() { this.showModal = false; this.cdr.detectChanges(); }
+  closeCreateDialog(): void { this.showCreateModal = false; }
 
-  statusClass(s: string): string {
-    const m: any = {
-      DRAFT:      'badge-secondary',
-      PROCESSING: 'badge-warning',
-      COMPLETED:  'badge-success',
-      CANCELLED:  'badge-danger'
-    };
-    return m[s] ?? 'badge-secondary';
+  createRun(): void {
+    if (!this.newPeriod) return;
+    this.creating = true;
+    const period = this.newPeriod.replace('-', '-'); // YYYY-MM
+    this.payrollSvc.createPayrollRun(period)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (run) => {
+          this.creating = false;
+          this.closeCreateDialog();
+          this.loadRuns();
+          this.router.navigate(['/payroll/runs', run.id, 'calculate']);
+        },
+        error: () => { this.creating = false; }
+      });
   }
 
-  isCalculating(id: string): boolean {
-    return this.calculatingRunId === id;
+  dismissWarning(): void {
+    this.missingRates = [];
+    this.missingBrackets = [];
   }
 }

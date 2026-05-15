@@ -1,63 +1,198 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { Observable, forkJoin } from 'rxjs';
+import { map } from 'rxjs/operators';
+import { environment } from '../../environments/environment';
 
-export interface PayrollConfig {
+export interface StatutoryRate {
   id: string;
-  companyId: string;
-  regime: string;
-  currency: string;
-  weeklyHours: number | null;
-  monthlyHours: number | null;
-  overtimeHoursForRate?: number | null;
-  workingDaysPerMonth: number | null;
-  cnssEnabled: boolean;
-  amoEnabled: boolean;
-  irEnabled: boolean;
-  cimrEnabled: boolean;
-  defaultCnssDeclaredDays: number | null;
-  payslipTemplate?: string | null;
-  notes?: string | null;
-  createdAt?: string;
-  updatedAt?: string;
-  company?: {
-    id: string;
-    name: string;
-    status: string;
-  };
+  code: string;           // 'CNSS_EMPLOYEE' | 'CNSS_EMPLOYER' | 'AMO_EMPLOYEE' | 'AMO_EMPLOYER' | 'CIMR_EMPLOYEE' | 'CIMR_EMPLOYER'
+  label: string;
+  rate: number;           // ex: 0.0448
+  ceiling?: number;       // plafond mensuel CNSS
+  effectiveFrom: string;
+  effectiveTo?: string;
+  version: number;
+  isActive: boolean;
+}
+
+export interface TaxBracket {
+  id: string;
+  code: string;           // 'IR_SALAIRE'
+  minAmount: number;
+  maxAmount?: number;     // null = illimité
+  rate: number;           // ex: 0.10
+  deduction: number;      // déduction fixe de la tranche
+  effectiveFrom: string;
+  effectiveTo?: string;
+  version: number;
+  isActive: boolean;
+}
+
+export interface PayrollRun {
+  id: string;
+  runNumber: number;
+  period: string;         // 'YYYY-MM'
+  status: 'DRAFT' | 'PROCESSING' | 'COMPLETED' | 'LOCKED' | 'ERROR';
+  employeeCount: number;
+  totalGross: number;
+  totalNet: number;
+  employerContributions: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PayrollItem {
+  id: string;
+  payslipId: string;
+  type: 'EARNING' | 'DEDUCTION' | 'EMPLOYER_CONTRIBUTION' | 'INFORMATION';
+  source: 'SALARY_COMPONENT' | 'STATUTORY' | 'MANUAL' | 'ADVANCE';
+  code: string;
+  label: string;
+  amount: number;
+  isTaxable: boolean;
+  isCnssApplicable: boolean;
+  isAmoApplicable: boolean;
+  sortOrder: number;
+}
+
+export interface Payslip {
+  id: string;
+  payrollRunId: string;
+  employeeId: string;
+  employeeName: string;
+  matricule: string;
+  period: string;
+  salaryType: 'MONTHLY' | 'DAILY' | 'HOURLY' | 'MISSION';
+  baseSalary: number;
+  grossSalary: number;       // somme gains uniquement
+  taxableGross: number;      // soumis IR
+  cnssGross: number;         // soumis CNSS (plafonné)
+  amoGross: number;          // soumis AMO
+  cnssEmployee: number;
+  amoEmployee: number;
+  irAmount: number;
+  netSalary: number;
+  cnssEmployer: number;
+  amoEmployer: number;
+  items: PayrollItem[];
+  status: 'DRAFT' | 'VALIDATED' | 'PAID';
+}
+
+export interface PayrollCalculationResult {
+  payrollRunId: string;
+  processedCount: number;
+  errorCount: number;
+  totalGross: number;
+  totalNet: number;
+  totalEmployerContributions: number;
+  errors: { employeeId: string; message: string }[];
 }
 
 @Injectable({ providedIn: 'root' })
-export class PayrollConfigService {
-  private apiUrl = 'http://localhost:3000/payroll-config'; // ✅ بلا /api
+export class PayrollService {
+  private api = environment.apiUrl;
 
   constructor(private http: HttpClient) {}
 
-  getMyConfig(): Observable<PayrollConfig> {
-    return this.http.get<PayrollConfig>(this.apiUrl);
+  // ─── STATUTORY RATES ───────────────────────────────────────────────────────
+
+  getStatutoryRates(date?: string): Observable<StatutoryRate[]> {
+    let params = new HttpParams();
+    if (date) params = params.set('date', date);
+    return this.http.get<StatutoryRate[]>(`${this.api}/payroll/statutory-rates`, { params });
   }
 
-  getAllConfigs(): Observable<PayrollConfig[]> {
-    return this.http.get<PayrollConfig[]>(`${this.apiUrl}/all`);
+  getStatutoryRateByCode(code: string, date?: string): Observable<StatutoryRate> {
+    let params = new HttpParams();
+    if (date) params = params.set('date', date);
+    return this.http.get<StatutoryRate>(`${this.api}/payroll/statutory-rates/${code}`, { params });
   }
 
-  createConfig(data: Partial<PayrollConfig>): Observable<PayrollConfig> {
-    return this.http.post<PayrollConfig>(this.apiUrl, data);
+  createStatutoryRate(rate: Partial<StatutoryRate>): Observable<StatutoryRate> {
+    return this.http.post<StatutoryRate>(`${this.api}/payroll/statutory-rates`, rate);
   }
 
-  updateMyConfig(data: Partial<PayrollConfig>): Observable<PayrollConfig> {
-    return this.http.put<PayrollConfig>(this.apiUrl, data);
+  updateStatutoryRate(id: string, rate: Partial<StatutoryRate>): Observable<StatutoryRate> {
+    return this.http.put<StatutoryRate>(`${this.api}/payroll/statutory-rates/${id}`, rate);
   }
 
-  updateConfig(id: string, data: Partial<PayrollConfig>): Observable<PayrollConfig> {
-    return this.http.put<PayrollConfig>(`${this.apiUrl}/${id}`, data);
+  // ─── TAX BRACKETS ──────────────────────────────────────────────────────────
+
+  getTaxBrackets(code: string = 'IR_SALAIRE', date?: string): Observable<TaxBracket[]> {
+    let params = new HttpParams().set('code', code);
+    if (date) params = params.set('date', date);
+    return this.http.get<TaxBracket[]>(`${this.api}/payroll/tax-brackets`, { params });
   }
 
-  upsertConfig(data: Partial<PayrollConfig>): Observable<PayrollConfig> {
-    return this.http.post<PayrollConfig>(`${this.apiUrl}/upsert`, data);
+  createTaxBracket(bracket: Partial<TaxBracket>): Observable<TaxBracket> {
+    return this.http.post<TaxBracket>(`${this.api}/payroll/tax-brackets`, bracket);
   }
 
-  deleteConfig(id: string): Observable<void> {
-    return this.http.delete<void>(`${this.apiUrl}/${id}`);
+  updateTaxBracket(id: string, bracket: Partial<TaxBracket>): Observable<TaxBracket> {
+    return this.http.put<TaxBracket>(`${this.api}/payroll/tax-brackets/${id}`, bracket);
+  }
+
+  deleteTaxBracket(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.api}/payroll/tax-brackets/${id}`);
+  }
+
+  // ─── PAYROLL RUNS ──────────────────────────────────────────────────────────
+
+  getPayrollRuns(): Observable<PayrollRun[]> {
+    return this.http.get<PayrollRun[]>(`${this.api}/payroll/runs`);
+  }
+
+  getPayrollRun(id: string): Observable<PayrollRun> {
+    return this.http.get<PayrollRun>(`${this.api}/payroll/runs/${id}`);
+  }
+
+  createPayrollRun(period: string): Observable<PayrollRun> {
+    return this.http.post<PayrollRun>(`${this.api}/payroll/runs`, { period });
+  }
+
+  deletePayrollRun(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.api}/payroll/runs/${id}`);
+  }
+
+  // ─── CALCUL ────────────────────────────────────────────────────────────────
+
+  calculateRun(runId: string): Observable<PayrollCalculationResult> {
+    return this.http.post<PayrollCalculationResult>(
+      `${this.api}/payroll/runs/${runId}/calculate`, {}
+    );
+  }
+
+  validateRun(runId: string): Observable<PayrollRun> {
+    return this.http.post<PayrollRun>(`${this.api}/payroll/runs/${runId}/validate`, {});
+  }
+
+  lockRun(runId: string): Observable<PayrollRun> {
+    return this.http.post<PayrollRun>(`${this.api}/payroll/runs/${runId}/lock`, {});
+  }
+
+  // ─── PAYSLIPS ──────────────────────────────────────────────────────────────
+
+  getPayslips(runId: string): Observable<Payslip[]> {
+    return this.http.get<Payslip[]>(`${this.api}/payroll/runs/${runId}/payslips`);
+  }
+
+  getPayslip(runId: string, payslipId: string): Observable<Payslip> {
+    return this.http.get<Payslip>(`${this.api}/payroll/runs/${runId}/payslips/${payslipId}`);
+  }
+
+  exportPayslipPdf(runId: string, payslipId: string): Observable<Blob> {
+    return this.http.get(`${this.api}/payroll/runs/${runId}/payslips/${payslipId}/pdf`, {
+      responseType: 'blob'
+    });
+  }
+
+  // ─── HELPER : charger taux + barème IR en parallèle ────────────────────────
+
+  loadPayrollConfig(date: string): Observable<{ rates: StatutoryRate[]; brackets: TaxBracket[] }> {
+    return forkJoin({
+      rates: this.getStatutoryRates(date),
+      brackets: this.getTaxBrackets('IR_SALAIRE', date)
+    });
   }
 }
