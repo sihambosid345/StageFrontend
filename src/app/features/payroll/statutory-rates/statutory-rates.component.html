@@ -1,0 +1,156 @@
+<!-- statutory-rates.component.html -->
+<div class="pr-page">
+
+  <!-- Header -->
+  <div class="pr-page__header">
+    <div>
+      <h1 class="pr-page__title">Taux Réglementaires</h1>
+      <p class="pr-page__subtitle">CNSS · AMO · CIMR — Taux dynamiques depuis la base de données</p>
+    </div>
+    <div class="pr-page__actions">
+      <button class="btn btn--ghost btn--sm" (click)="toggleShowAll()">
+        <span class="icon">{{ showAll ? '👁' : '📜' }}</span>
+        {{ showAll ? 'Masquer historique' : 'Voir historique' }}
+      </button>
+      <button class="btn btn--primary" (click)="openCreate()">
+        <span class="icon">+</span> Nouveau taux
+      </button>
+    </div>
+  </div>
+
+  <!-- Alerts -->
+  <div class="alert alert--success" *ngIf="successMessage">{{ successMessage }}</div>
+  <div class="alert alert--error" *ngIf="errorMessage && !editMode">{{ errorMessage }}</div>
+
+  <!-- Loading -->
+  <div class="pr-loading" *ngIf="loading">
+    <div class="pr-loading__spinner"></div>
+    <span>Chargement des taux…</span>
+  </div>
+
+  <!-- Rate Groups Grid -->
+  <div class="rate-groups" *ngIf="!loading">
+    <div class="rate-group" *ngFor="let group of rateGroups">
+      <div class="rate-group__header">
+        <div class="rate-group__info">
+          <span class="rate-group__code">{{ group.code }}</span>
+          <span class="rate-group__label">{{ group.label }}</span>
+        </div>
+        <div class="rate-group__current" *ngIf="group.currentRate">
+          <span class="rate-badge rate-badge--active">
+            {{ group.currentRate.rate | number:'1.2-4' }}%
+          </span>
+          <span class="rate-ceiling" *ngIf="group.currentRate.ceiling">
+            Plafond: {{ group.currentRate.ceiling | number:'1.0-0' }} MAD
+          </span>
+        </div>
+        <span class="rate-badge rate-badge--inactive" *ngIf="!group.currentRate">
+          Non configuré
+        </span>
+      </div>
+
+      <!-- Current rate actions -->
+      <div class="rate-group__actions" *ngIf="group.currentRate">
+        <button class="btn btn--ghost btn--xs" (click)="openEdit(group.currentRate)">
+          ✏️ Modifier
+        </button>
+        <button class="btn btn--danger btn--xs" (click)="deactivate(group.currentRate!)">
+          🗑 Désactiver
+        </button>
+      </div>
+
+      <!-- History (if showAll) -->
+      <div class="rate-history" *ngIf="showAll && group.rates.length > 1">
+        <div class="rate-history__title">Historique</div>
+        <table class="pr-table pr-table--compact">
+          <thead>
+            <tr>
+              <th>Taux</th>
+              <th>Plafond</th>
+              <th>Du</th>
+              <th>Au</th>
+              <th>Version</th>
+              <th>Statut</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let r of group.rates" [class.row--active]="r.isActive">
+              <td><strong>{{ r.rate | number:'1.2-4' }}%</strong></td>
+              <td>{{ r.ceiling ? (r.ceiling | number:'1.0-0') + ' MAD' : '—' }}</td>
+              <td>{{ r.effectiveFrom | date:'dd/MM/yyyy' }}</td>
+              <td>{{ r.effectiveTo ? (r.effectiveTo | date:'dd/MM/yyyy') : '∞' }}</td>
+              <td><span class="version-badge">{{ getVersionBadge(r) }}</span></td>
+              <td>
+                <span class="status-chip" [class.status-chip--active]="r.isActive" [class.status-chip--inactive]="!r.isActive">
+                  {{ r.isActive ? 'Actif' : 'Archivé' }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Form Modal -->
+  <div class="pr-modal-overlay" *ngIf="editMode" (click)="cancel()"></div>
+  <div class="pr-modal" *ngIf="editMode">
+    <div class="pr-modal__header">
+      <h2>{{ selectedRate ? 'Modifier le taux' : 'Nouveau taux réglementaire' }}</h2>
+      <button class="btn-close" (click)="cancel()">✕</button>
+    </div>
+
+    <form [formGroup]="form" (ngSubmit)="save()" class="pr-form">
+      <div class="alert alert--error" *ngIf="errorMessage">{{ errorMessage }}</div>
+
+      <div class="pr-form__row pr-form__row--2">
+        <div class="pr-form__field">
+          <label>Code *</label>
+          <select formControlName="code" [class.invalid]="form.get('code')?.invalid && form.get('code')?.touched">
+            <option value="">— Sélectionner —</option>
+            <option *ngFor="let rc of RATE_CODES" [value]="rc.code">{{ rc.code }}</option>
+          </select>
+          <span class="pr-form__error" *ngIf="form.get('code')?.invalid && form.get('code')?.touched">Champ requis</span>
+        </div>
+        <div class="pr-form__field">
+          <label>Libellé *</label>
+          <input type="text" formControlName="label" placeholder="ex: CNSS Salarié" />
+          <span class="pr-form__error" *ngIf="form.get('label')?.invalid && form.get('label')?.touched">Champ requis</span>
+        </div>
+      </div>
+
+      <div class="pr-form__row pr-form__row--2">
+        <div class="pr-form__field">
+          <label>Taux (%) *</label>
+          <input type="number" formControlName="rate" step="0.0001" min="0" max="100" placeholder="ex: 4.4800" />
+          <span class="pr-form__error" *ngIf="form.get('rate')?.invalid && form.get('rate')?.touched">Taux entre 0 et 100</span>
+        </div>
+        <div class="pr-form__field">
+          <label>Plafond mensuel (MAD)</label>
+          <input type="number" formControlName="ceiling" placeholder="ex: 6000 (laisser vide si illimité)" />
+        </div>
+      </div>
+
+      <div class="pr-form__row pr-form__row--2">
+        <div class="pr-form__field">
+          <label>Applicable à partir du *</label>
+          <input type="date" formControlName="effectiveFrom" />
+          <span class="pr-form__error" *ngIf="form.get('effectiveFrom')?.invalid && form.get('effectiveFrom')?.touched">Date requise</span>
+        </div>
+        <div class="pr-form__field">
+          <label>Applicable jusqu'au</label>
+          <input type="date" formControlName="effectiveTo" />
+          <small>Laisser vide si le taux est indéfini</small>
+        </div>
+      </div>
+
+      <div class="pr-modal__footer">
+        <button type="button" class="btn btn--ghost" (click)="cancel()">Annuler</button>
+        <button type="submit" class="btn btn--primary" [disabled]="saving">
+          <span *ngIf="saving" class="spinner-sm"></span>
+          {{ saving ? 'Enregistrement…' : (selectedRate ? 'Mettre à jour' : 'Créer le taux') }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
