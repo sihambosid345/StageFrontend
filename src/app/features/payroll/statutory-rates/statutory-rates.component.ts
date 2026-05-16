@@ -1,363 +1,278 @@
+// ============================================================
+// statutory-rates.component.ts
+// Gestion des taux réglementaires (CNSS, AMO, CIMR) — CRUD
+// ============================================================
 import { Component, OnInit, OnDestroy } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { Subject, takeUntil } from 'rxjs';
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { CommonModule, DecimalPipe, DatePipe } from '@angular/common';
+import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { Subject } from 'rxjs';
+import { takeUntil, finalize } from 'rxjs/operators';
+import { PayrollService, StatutoryRate } from '../../../core/services/payroll-config.service';
+
+interface RateGroup {
+  code: string;
+  label: string;
+  rates: StatutoryRate[];
+  currentRate?: StatutoryRate;
+}
 
 @Component({
   selector: 'app-statutory-rates',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule],
-  template: `
-    <div class="page-container">
-      <div class="page-header">
-        <div>
-          <h1 class="page-title">Taux Statutaires</h1>
-          <p class="page-subtitle">Gestion des taux CNSS, AMO, CIMR, IR et autres cotisations sociales — lecture depuis la base de données</p>
-        </div>
-        <button class="btn-primary" (click)="openForm()">+ Nouveau taux</button>
-      </div>
-
-      <!-- Filtre date -->
-      <div class="filter-bar">
-        <label>Date de référence</label>
-        <input type="date" [(ngModel)]="filterDate" (change)="loadRates()" class="form-input-sm">
-        <span class="tag-info">
-          {{ rates.length }} taux actif(s) au {{ filterDate }}
-        </span>
-      </div>
-
-      <!-- Tableau taux -->
-      <div class="card">
-        <div class="table-wrapper">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>CODE</th>
-                <th>LIBELLÉ</th>
-                <th>TAUX (%)</th>
-                <th>PLAFOND (MAD)</th>
-                <th>EFFECTIF DU</th>
-                <th>EFFECTIF AU</th>
-                <th>VERSION</th>
-                <th>STATUT</th>
-                <th>ACTIONS</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngIf="loading">
-                <td colspan="9" class="loading-cell"><div class="spinner"></div> Chargement...</td>
-              </tr>
-              <tr *ngIf="!loading && rates.length === 0">
-                <td colspan="9" class="empty-cell">
-                  <div class="empty-state">
-                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.5">
-                      <circle cx="12" cy="12" r="10"/>
-                      <line x1="12" y1="8" x2="12" y2="12"/>
-                      <line x1="12" y1="16" x2="12.01" y2="16"/>
-                    </svg>
-                    <p>Aucun taux configuré pour le {{ filterDate }}</p>
-                    <button class="btn-primary" (click)="openForm()">Créer le premier taux</button>
-                  </div>
-                </td>
-              </tr>
-              <tr *ngFor="let rate of rates" class="table-row">
-                <td><span class="code-badge">{{ rate.code }}</span></td>
-                <td>{{ rate.label }}</td>
-                <td><span class="rate-pill">{{ (rate.rate * 100) | number:'1.0-2' }}%</span></td>
-                <td class="amount">{{ rate.ceiling ? (rate.ceiling | number:'1.0-0') : '—' }}</td>
-                <td>{{ rate.effectiveFrom | date:'dd/MM/yyyy' }}</td>
-                <td>{{ rate.effectiveTo ? (rate.effectiveTo | date:'dd/MM/yyyy') : '∞' }}</td>
-                <td><span class="version-badge">v{{ rate.version }}</span></td>
-                <td>
-                  <span class="status-dot" [class.active]="rate.isActive" [class.inactive]="!rate.isActive">
-                    {{ rate.isActive ? 'Actif' : 'Inactif' }}
-                  </span>
-                </td>
-                <td class="actions-cell">
-                  <button class="action-btn btn-edit" (click)="editRate(rate)" title="Modifier">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                    </svg>
-                  </button>
-                  <button class="action-btn btn-delete" (click)="deleteRate(rate)" title="Supprimer">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <polyline points="3 6 5 6 21 6"/>
-                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                    </svg>
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- Modal formulaire -->
-      <div class="modal-overlay" *ngIf="showForm" (click)="closeForm()" @fadeInOut>
-        <div class="modal-dialog" (click)="$event.stopPropagation()">
-          <div class="modal-header">
-            <h2>{{ editingRate?.id ? 'Modifier taux' : 'Nouveau taux' }}</h2>
-            <button class="btn-close" (click)="closeForm()">×</button>
-          </div>
-
-          <form [formGroup]="form" (ngSubmit)="saveRate()" class="modal-body">
-            <div class="form-group">
-              <label for="code" class="required">Code</label>
-              <select id="code" formControlName="code" class="form-control" [disabled]="!!editingRate?.id">
-                <option value="">-- Sélectionner --</option>
-                <option value="CNSS_EMPLOYEE">CNSS Salarié</option>
-                <option value="CNSS_EMPLOYER">CNSS Employeur</option>
-                <option value="AMO_EMPLOYEE">AMO Salarié</option>
-                <option value="AMO_EMPLOYER">AMO Employeur</option>
-                <option value="CIMR_EMPLOYEE">CIMR Salarié</option>
-                <option value="CIMR_EMPLOYER">CIMR Employeur</option>
-                <option value="TRAINING_TAX">Taxe de Formation Professionnelle</option>
-                <option value="FAMILY_ALLOWANCE">Allocations Familiales</option>
-                <option value="SOCIAL_BENEFITS">Prestations Sociales</option>
-                <option value="DAMANCOM">DAMANCOM</option>
-              </select>
-              <div class="form-error" *ngIf="form.get('code')?.invalid && form.get('code')?.touched">Code requis</div>
-            </div>
-
-            <div class="form-group">
-              <label for="label" class="required">Libellé</label>
-              <input id="label" type="text" formControlName="label" class="form-control" placeholder="Ex: Cotisation CNSS Salarié">
-              <div class="form-error" *ngIf="form.get('label')?.invalid && form.get('label')?.touched">Libellé requis</div>
-            </div>
-
-            <div class="form-row">
-              <div class="form-group">
-                <label for="rate" class="required">Taux (%)</label>
-                <input id="rate" type="number" formControlName="rate" class="form-control" placeholder="4.48" step="0.01" min="0" max="100">
-                <div class="form-error" *ngIf="form.get('rate')?.invalid && form.get('rate')?.touched">Taux requis (0-100)</div>
-              </div>
-
-              <div class="form-group">
-                <label for="ceiling">Plafond Mensuel (MAD)</label>
-                <input id="ceiling" type="number" formControlName="ceiling" class="form-control" placeholder="6000" min="0">
-                <small class="form-help">Optionnel — pour CNSS salarié uniquement</small>
-              </div>
-            </div>
-
-            <div class="form-row">
-              <div class="form-group">
-                <label for="effectiveFrom" class="required">Effectif du</label>
-                <input id="effectiveFrom" type="date" formControlName="effectiveFrom" class="form-control">
-                <div class="form-error" *ngIf="form.get('effectiveFrom')?.invalid && form.get('effectiveFrom')?.touched">Date requise</div>
-              </div>
-
-              <div class="form-group">
-                <label for="effectiveTo">Effectif au</label>
-                <input id="effectiveTo" type="date" formControlName="effectiveTo" class="form-control">
-                <small class="form-help">Laisser vide pour "indéfini"</small>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label for="isActive">
-                <input id="isActive" type="checkbox" formControlName="isActive" class="form-checkbox">
-                <span>Actif</span>
-              </label>
-            </div>
-
-            <div class="modal-footer">
-              <button type="button" class="btn-secondary" (click)="closeForm()">Annuler</button>
-              <button type="submit" class="btn-primary" [disabled]="!form.valid || saving">
-                {{ saving ? 'Sauvegarde...' : 'Enregistrer' }}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-
-    <style>
-      .page-container { max-width: 1200px; margin: 0 auto; padding: 24px; }
-      .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-      .page-title { margin: 0; font-size: 28px; font-weight: 700; }
-      .page-subtitle { margin: 4px 0 0; font-size: 14px; color: #6b7280; }
-      .btn-primary { background: #3b82f6; color: white; border: none; padding: 10px 16px; border-radius: 6px; font-weight: 500; cursor: pointer; }
-      .btn-primary:hover { background: #2563eb; }
-      
-      .filter-bar { display: flex; gap: 12px; margin-bottom: 24px; align-items: center; }
-      .filter-bar label { font-weight: 600; font-size: 14px; }
-      .form-input-sm { padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 14px; }
-      .tag-info { display: inline-block; background: #e0e7ff; color: #4f46e5; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; }
-
-      .card { background: white; border-radius: 8px; border: 1px solid #e5e7eb; }
-      .table-wrapper { overflow-x: auto; }
-      .data-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-      .data-table thead { background: #f9fafb; border-bottom: 2px solid #e5e7eb; }
-      .data-table th { padding: 12px; text-align: left; font-weight: 600; color: #374151; }
-      .data-table td { padding: 12px; border-bottom: 1px solid #e5e7eb; }
-      .data-table tbody tr:hover { background: #fafafa; }
-      
-      .code-badge { display: inline-block; background: #f0f9ff; color: #0369a1; padding: 2px 8px; border-radius: 4px; font-family: monospace; font-size: 12px; }
-      .rate-pill { display: inline-block; background: #dcfce7; color: #166534; padding: 4px 12px; border-radius: 12px; font-weight: 600; }
-      .version-badge { display: inline-block; background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
-      .status-dot { display: inline-flex; align-items: center; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; }
-      .status-dot.active { background: #dcfce7; color: #166534; }
-      .status-dot.inactive { background: #fee2e2; color: #991b1b; }
-
-      .loading-cell, .empty-cell { text-align: center; padding: 40px !important; }
-      .spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid #e5e7eb; border-radius: 50%; border-top-color: #3b82f6; animation: spin 1s linear infinite; }
-      @keyframes spin { to { transform: rotate(360deg); } }
-      
-      .actions-cell { white-space: nowrap; }
-      .action-btn { background: none; border: none; cursor: pointer; padding: 6px; color: #6b7280; }
-      .action-btn:hover { color: #111827; }
-      .btn-delete:hover { color: #dc2626; }
-
-      .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-      .modal-dialog { background: white; border-radius: 8px; max-width: 500px; width: 90%; max-height: 90vh; overflow-y: auto; }
-      .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px; border-bottom: 1px solid #e5e7eb; }
-      .modal-header h2 { margin: 0; font-size: 20px; }
-      .btn-close { background: none; border: none; font-size: 28px; cursor: pointer; color: #6b7280; }
-      .modal-body { padding: 20px; }
-      .modal-footer { display: flex; justify-content: flex-end; gap: 12px; padding: 20px; border-top: 1px solid #e5e7eb; }
-      
-      .form-group { margin-bottom: 16px; }
-      .form-group label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 14px; }
-      .form-group label.required::after { content: ' *'; color: #dc2626; }
-      .form-control, .form-input-sm { width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 14px; }
-      .form-control:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
-      .form-error { color: #dc2626; font-size: 12px; margin-top: 4px; }
-      .form-help { display: block; color: #6b7280; font-size: 12px; margin-top: 4px; }
-      .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-      .form-checkbox { margin-right: 6px; }
-
-      .btn-secondary { background: #e5e7eb; color: #111827; border: none; padding: 10px 16px; border-radius: 6px; font-weight: 500; cursor: pointer; }
-      .btn-secondary:hover { background: #d1d5db; }
-    </style>
-  `
+  imports: [CommonModule, ReactiveFormsModule, DecimalPipe, DatePipe],
+  templateUrl: './statutory-rates.component.html',
+  styles: [`
+    .pr-page { padding: 1.5rem; }
+    .pr-page__header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; }
+    .pr-page__title { font-size: 1.5rem; font-weight: 700; margin: 0; }
+    .pr-page__subtitle { color: #6b7280; margin: 0.25rem 0 0; font-size: 0.875rem; }
+    .pr-page__actions { display: flex; gap: 0.75rem; align-items: center; }
+    .btn { display: inline-flex; align-items: center; gap: 0.4rem; border: none; border-radius: 6px; padding: 0.5rem 1rem; cursor: pointer; font-size: 0.875rem; font-weight: 500; transition: all .15s; }
+    .btn--primary { background: #4f46e5; color: white; }
+    .btn--primary:hover { background: #4338ca; }
+    .btn--primary:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn--ghost { background: white; color: #374151; border: 1px solid #d1d5db; }
+    .btn--ghost:hover { background: #f9fafb; }
+    .btn--danger { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+    .btn--xs { padding: 0.25rem 0.6rem; font-size: 0.75rem; }
+    .btn--sm { padding: 0.35rem 0.75rem; font-size: 0.8rem; }
+    .btn--seed { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+    .icon { font-size: 1rem; }
+    .alert { padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.875rem; }
+    .alert--success { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+    .alert--error { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+    .pr-loading { display: flex; align-items: center; gap: 0.75rem; padding: 2rem; color: #6b7280; }
+    .pr-loading__spinner { width: 20px; height: 20px; border: 2px solid #e5e7eb; border-top-color: #4f46e5; border-radius: 50%; animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .rate-groups { display: grid; gap: 1rem; }
+    .rate-group { background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 1.25rem; }
+    .rate-group__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
+    .rate-group__info { display: flex; flex-direction: column; gap: 0.2rem; }
+    .rate-group__code { font-size: 0.75rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: .05em; }
+    .rate-group__label { font-size: 0.9rem; font-weight: 600; color: #111827; }
+    .rate-group__current { display: flex; align-items: center; gap: 0.5rem; }
+    .rate-group__actions { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
+    .rate-badge { padding: 0.25rem 0.6rem; border-radius: 999px; font-size: 0.8rem; font-weight: 600; }
+    .rate-badge--active { background: #d1fae5; color: #065f46; }
+    .rate-badge--inactive { background: #f3f4f6; color: #6b7280; }
+    .rate-ceiling { font-size: 0.8rem; color: #6b7280; }
+    .rate-history { margin-top: 0.75rem; border-top: 1px solid #f3f4f6; padding-top: 0.75rem; }
+    .rate-history__title { font-size: 0.75rem; font-weight: 600; color: #9ca3af; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .pr-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .pr-table th, .pr-table td { padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid #f3f4f6; }
+    .pr-table th { font-weight: 600; color: #374151; background: #f9fafb; }
+    .pr-table--compact th, .pr-table--compact td { padding: 0.35rem 0.5rem; }
+    .row--active { background: #f0fdf4; }
+    .version-badge { background: #ede9fe; color: #5b21b6; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; }
+    .status-chip { padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 500; }
+    .status-chip--active { background: #d1fae5; color: #065f46; }
+    .status-chip--inactive { background: #f3f4f6; color: #6b7280; }
+    /* Modal */
+    .pr-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; }
+    .pr-modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); background: white; border-radius: 12px; width: min(560px, 95vw); max-height: 90vh; overflow-y: auto; z-index: 101; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+    .pr-modal__header { display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 1.5rem; border-bottom: 1px solid #e5e7eb; }
+    .pr-modal__header h2 { margin: 0; font-size: 1.1rem; font-weight: 700; }
+    .btn-close { background: none; border: none; font-size: 1.25rem; cursor: pointer; color: #6b7280; padding: 0.25rem; line-height: 1; }
+    .pr-form { padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
+    .pr-form__row { display: grid; gap: 1rem; }
+    .pr-form__row--2 { grid-template-columns: 1fr 1fr; }
+    .pr-form__field { display: flex; flex-direction: column; gap: 0.35rem; }
+    .pr-form__field label { font-size: 0.8rem; font-weight: 600; color: #374151; text-transform: uppercase; letter-spacing: .04em; }
+    .pr-form__field input, .pr-form__field select { border: 1px solid #d1d5db; border-radius: 6px; padding: 0.5rem 0.75rem; font-size: 0.9rem; outline: none; transition: border-color .15s; }
+    .pr-form__field input:focus, .pr-form__field select:focus { border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,.1); }
+    .pr-form__field input.invalid, .pr-form__field select.invalid { border-color: #ef4444; }
+    .pr-form__field small { font-size: 0.75rem; color: #9ca3af; }
+    .pr-form__error { font-size: 0.75rem; color: #ef4444; }
+    .pr-modal__footer { display: flex; justify-content: flex-end; gap: 0.75rem; padding: 1rem 1.5rem; border-top: 1px solid #e5e7eb; }
+    .spinner-sm { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.4); border-top-color: white; border-radius: 50%; animation: spin .7s linear infinite; display: inline-block; }
+  `]
 })
 export class StatutoryRatesComponent implements OnInit, OnDestroy {
-  rates: any[] = [];
-  form!: FormGroup;
-  showForm = false;
+
+  rates: StatutoryRate[] = [];
+  rateGroups: RateGroup[] = [];
   loading = false;
   saving = false;
-  editingRate: any | null = null;
-  filterDate = new Date().toISOString().split('T')[0];
+  seeding = false;
+  showAll = false;
+  editMode = false;
+  selectedRate?: StatutoryRate;
+  errorMessage = '';
+  successMessage = '';
 
+  form!: FormGroup;
   private destroy$ = new Subject<void>();
 
-  constructor(
-    private http: HttpClient,
-    private formBuilder: FormBuilder
-  ) {
-    this.form = this.formBuilder.group({
-      code: ['', Validators.required],
-      label: ['', Validators.required],
-      rate: ['', [Validators.required, Validators.min(0), Validators.max(100)]],
-      ceiling: [null],
-      effectiveFrom: ['', Validators.required],
-      effectiveTo: [null],
-      isActive: [true]
-    });
-  }
+  readonly RATE_CODES = [
+    { code: 'CNSS_EMPLOYEE', label: 'CNSS — Part Salarié' },
+    { code: 'CNSS_EMPLOYER', label: 'CNSS — Part Patronale' },
+    { code: 'AMO_EMPLOYEE',  label: 'AMO — Part Salarié'  },
+    { code: 'AMO_EMPLOYER',  label: 'AMO — Part Patronale' },
+    { code: 'CIMR_EMPLOYEE', label: 'CIMR — Part Salarié' },
+    { code: 'CIMR_EMPLOYER', label: 'CIMR — Part Patronale' },
+    { code: 'TRAINING_TAX',    label: 'Taxe de Formation Professionnelle' },
+    { code: 'FAMILY_ALLOWANCE', label: 'Allocations Familiales' },
+    { code: 'SOCIAL_BENEFITS',  label: 'Prestations Sociales' },
+  ];
 
-  ngOnInit() {
+  constructor(private payrollSvc: PayrollService, private fb: FormBuilder) {}
+
+  ngOnInit(): void {
+    this.buildForm();
     this.loadRates();
   }
 
-  ngOnDestroy() {
+  ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
   }
 
-  loadRates() {
+  private buildForm(): void {
+    this.form = this.fb.group({
+      code:          ['', Validators.required],
+      label:         ['', Validators.required],
+      // rate stored as percentage in form (4.48), converted to decimal on save (0.0448)
+      rate:          [null, [Validators.required, Validators.min(0), Validators.max(100)]],
+      ceiling:       [null],
+      effectiveFrom: ['', Validators.required],
+      effectiveTo:   [''],
+      isActive:      [true],
+    });
+  }
+
+  loadRates(): void {
     this.loading = true;
-    let params = new HttpParams();
-    if (this.filterDate) params = params.set('date', this.filterDate);
-    this.http.get<any[]>(`http://localhost:3000/payroll/statutory-rates`, { params })
-      .pipe(takeUntil(this.destroy$))
+    this.errorMessage = '';
+    this.payrollSvc.getStatutoryRates()
+      .pipe(takeUntil(this.destroy$), finalize(() => this.loading = false))
       .subscribe({
-        next: (data) => {
-          this.rates = data;
-          this.loading = false;
+        next: (rates: StatutoryRate[]) => {
+          this.buildRateGroups(rates);
         },
-        error: (err) => {
-          console.error('Erreur chargement taux:', err);
-          alert('Erreur lors du chargement des taux');
-          this.loading = false;
-        }
+        error: (err: Error) => { this.errorMessage = err.message; }
       });
   }
 
-  openForm() {
-    this.editingRate = null;
-    this.form.reset({ isActive: true });
-    this.showForm = true;
-  }
-
-  editRate(rate: any) {
-    this.editingRate = rate;
-    this.form.patchValue({
-      code: rate.code,
-      label: rate.label,
-      rate: rate.rate * 100,
-      ceiling: rate.ceiling || null,
-      effectiveFrom: rate.effectiveFrom?.split('T')[0],
-      effectiveTo: rate.effectiveTo ? rate.effectiveTo.split('T')[0] : null,
-      isActive: rate.isActive
+  private buildRateGroups(allRates: StatutoryRate[]): void {
+    const grouped = new Map<string, StatutoryRate[]>();
+    for (const r of allRates) {
+      if (!grouped.has(r.code)) grouped.set(r.code, []);
+      grouped.get(r.code)!.push(r);
+    }
+    this.rateGroups = this.RATE_CODES.map(rc => {
+      const history = (grouped.get(rc.code) ?? []).sort(
+        (a, b) => new Date(b.effectiveFrom).getTime() - new Date(a.effectiveFrom).getTime()
+      );
+      const filtered = this.showAll ? history : history.filter(r => r.isActive);
+      return {
+        code: rc.code,
+        label: rc.label,
+        rates: filtered,
+        currentRate: history.find(r => r.isActive)
+      };
     });
-    this.showForm = true;
   }
 
-  closeForm() {
-    this.showForm = false;
-    this.editingRate = null;
-    this.form.reset({ isActive: true });
+  getVersionBadge(r: StatutoryRate): string {
+    return `v${r.version ?? 1}`;
   }
 
-  saveRate() {
-    if (!this.form.valid) return;
+  openCreate(): void {
+    this.selectedRate = undefined;
+    this.editMode = true;
+    this.errorMessage = '';
+    this.form.reset({
+      effectiveFrom: new Date().toISOString().substring(0, 10),
+      isActive: true,
+    });
+  }
 
+  openEdit(rate: StatutoryRate): void {
+    this.selectedRate = rate;
+    this.editMode = true;
+    this.errorMessage = '';
+    this.form.patchValue({
+      code:          rate.code,
+      label:         rate.label,
+      // Display as percentage
+      rate:          +(rate.rate * 100).toFixed(4),
+      ceiling:       rate.ceiling ?? null,
+      effectiveFrom: new Date(rate.effectiveFrom).toISOString().substring(0, 10),
+      effectiveTo:   rate.effectiveTo ? new Date(rate.effectiveTo).toISOString().substring(0, 10) : '',
+      isActive:      rate.isActive,
+    });
+  }
+
+  cancel(): void {
+    this.editMode = false;
+    this.selectedRate = undefined;
+    this.form.reset();
+    this.errorMessage = '';
+  }
+
+  save(): void {
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      return;
+    }
     this.saving = true;
-    const data = {
-      ...this.form.value,
-      rate: this.form.value.rate / 100
+    this.errorMessage = '';
+
+    const v = this.form.value;
+    const payload: Partial<StatutoryRate> = {
+      code:          v.code,
+      label:         v.label,
+      // Convert percentage -> decimal for storage (4.48 -> 0.0448)
+      rate:          +(v.rate / 100).toFixed(6),
+      ceiling:       v.ceiling || undefined,
+      effectiveFrom: v.effectiveFrom,
+      effectiveTo:   v.effectiveTo || undefined,
+      isActive:      v.isActive ?? true,
     };
 
-    const url = this.editingRate
-      ? `http://localhost:3000/payroll/statutory-rates/${this.editingRate.id}`
-      : `http://localhost:3000/payroll/statutory-rates`;
+    const obs = this.selectedRate
+      ? this.payrollSvc.updateStatutoryRate(this.selectedRate.id, payload)
+      : this.payrollSvc.createStatutoryRate(payload);
 
-    const request = this.editingRate
-      ? this.http.put<any>(url, data)
-      : this.http.post<any>(url, data);
-
-    request.pipe(takeUntil(this.destroy$)).subscribe({
-      next: () => {
-        alert(this.editingRate ? 'Taux modifié' : 'Taux créé');
-        this.closeForm();
-        this.loadRates();
-      },
-      error: (err) => {
-        console.error('Erreur sauvegarde:', err);
-        alert('Erreur lors de la sauvegarde');
-        this.saving = false;
-      }
-    });
-  }
-
-  deleteRate(rate: any) {
-    if (!confirm(`Supprimer le taux "${rate.label}" ?`)) return;
-
-    this.http.delete(`http://localhost:3000/payroll/statutory-rates/${rate.id}`)
-      .pipe(takeUntil(this.destroy$))
+    obs.pipe(takeUntil(this.destroy$), finalize(() => this.saving = false))
       .subscribe({
         next: () => {
-          alert('Taux supprimé');
+          this.successMessage = this.selectedRate ? 'Taux mis à jour.' : 'Taux créé.';
+          this.editMode = false;
           this.loadRates();
+          setTimeout(() => this.successMessage = '', 3000);
         },
-        error: (err) => {
-          console.error('Erreur suppression:', err);
-          alert('Erreur lors de la suppression');
-        }
+        error: (err: Error) => { this.errorMessage = err.message; }
       });
+  }
+
+  deactivate(rate: StatutoryRate): void {
+    if (!confirm(`Désactiver le taux "${rate.label}" ?`)) return;
+    this.payrollSvc.deleteStatutoryRate(rate.id)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => { this.successMessage = 'Taux désactivé.'; this.loadRates(); },
+        error: (err: Error) => { this.errorMessage = err.message; }
+      });
+  }
+
+  seedRates(): void {
+    if (!confirm('Initialiser les taux légaux marocains 2026 ? Les taux existants ne seront pas écrasés.')) return;
+    this.seeding = true;
+    this.payrollSvc.seedStatutoryRates()
+      .pipe(takeUntil(this.destroy$), finalize(() => this.seeding = false))
+      .subscribe({
+        next: (res) => {
+          this.successMessage = res.message;
+          this.loadRates();
+          setTimeout(() => this.successMessage = '', 4000);
+        },
+        error: (err: Error) => { this.errorMessage = err.message; }
+      });
+  }
+
+  toggleShowAll(): void {
+    this.showAll = !this.showAll;
+    this.loadRates();
   }
 }
