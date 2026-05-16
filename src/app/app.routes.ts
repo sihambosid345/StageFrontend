@@ -23,7 +23,6 @@ export const routes: Routes = [
         loadComponent: () => import('./features/dashboard/dashboard.component').then(m => m.DashboardComponent)
       },
       {
-        // Accessible au super admin (via guard 'companies') ET aux admins avec permission
         path: 'companies',
         canActivate: [permissionGuard('companies')],
         loadComponent: () => import('./features/companies/companies.component').then(m => m.CompaniesComponent)
@@ -54,26 +53,41 @@ export const routes: Routes = [
         loadComponent: () => import('./features/contracts/contracts.component').then(m => m.ContractsComponent)
       },
       {
-        // Licences : super admin seulement (guard vérifie isSuperAdmin)
         path: 'licenses',
         canActivate: [permissionGuard('licenses')],
         loadComponent: () => import('./features/licenses/licenses.component').then(m => m.LicensesComponent)
       },
-       {
-            path: 'payroll/config',
-            canActivate: [permissionGuard('payroll')],
-            loadComponent: () => import('./features/payroll/config/config.component').then(m => m.PayrollConfigComponent)
-          },
+      {
+        path: 'payroll/config',
+        canActivate: [permissionGuard('payroll')],
+        loadComponent: () => import('./features/payroll/config/config.component').then(m => m.PayrollConfigComponent)
+      },
       {
         path: 'payroll/periods',
         canActivate: [permissionGuard('payroll')],
         loadComponent: () => import('./features/payroll/periods/periods.component').then(m => m.PeriodsComponent)
       },
+      // ─── PAYROLL RUNS ───────────────────────────────────────
       {
         path: 'payroll/runs',
         canActivate: [permissionGuard('payroll')],
         loadComponent: () => import('./features/payroll/runs/runs.component').then(m => m.PayrollRunsComponent)
       },
+      // FIX : Route calcul (était manquante → causait redirect vers dashboard)
+      {
+        path: 'payroll/runs/:id/calculate',
+        canActivate: [permissionGuard('payroll')],
+        loadComponent: () => import('./features/payroll/runs/calculate/calculate.component')
+          .then(m => m.CalculateRunComponent)
+      },
+      // FIX : payslips est dans payroll/payslips/ (pas dans runs/payslips/)
+      {
+        path: 'payroll/runs/:id/payslips',
+        canActivate: [permissionGuard('payroll')],
+        loadComponent: () => import('./features/payroll/payslips/payslips.component')
+          .then(m => m.PayslipsComponent)
+      },
+      // ────────────────────────────────────────────────────────
       {
         path: 'payroll/items',
         canActivate: [permissionGuard('payroll')],
@@ -87,22 +101,26 @@ export const routes: Routes = [
       {
         path: 'payroll/statutory-rates',
         canActivate: [permissionGuard('payroll')],
-        loadComponent: () => import('./features/payroll/statutory-rates/statutory-rates.component').then(m => m.StatutoryRatesComponent)
+        loadComponent: () => import('./features/payroll/statutory-rates/statutory-rates.component')
+          .then(m => m.StatutoryRatesComponent)
       },
       {
         path: 'payroll/tax-brackets',
         canActivate: [permissionGuard('payroll')],
-        loadComponent: () => import('./features/payroll/tax/tax-brackets.component').then(m => m.TaxBracketsComponent)
+        loadComponent: () => import('./features/payroll/tax/tax-brackets.component')
+          .then(m => m.TaxBracketsComponent)
       },
       {
         path: 'variable-items',
         canActivate: [permissionGuard('contracts')],
-        loadComponent: () => import('./features/variable-items/variable-items.component').then(m => m.VariableItemsComponent)
+        loadComponent: () => import('./features/variable-items/variable-items.component')
+          .then(m => m.VariableItemsComponent)
       },
       {
         path: 'recurring-items',
         canActivate: [permissionGuard('payroll')],
-        loadComponent: () => import('./features/recurring-items/recurring-items.component').then(m => m.RecurringItemsComponent)
+        loadComponent: () => import('./features/recurring-items/recurring-items.component')
+          .then(m => m.RecurringItemsComponent)
       },
       {
         path: 'users',

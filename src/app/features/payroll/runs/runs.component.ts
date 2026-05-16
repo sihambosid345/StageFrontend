@@ -67,22 +67,23 @@ import { PayrollConfigWarningComponent } from '../config/warning.component';
                 <td colspan="8" class="empty-cell">Aucune exécution trouvée</td>
               </tr>
               <tr *ngFor="let run of filteredRuns" class="table-row">
-                <td>{{ formatPeriod(run.period) }}</td>
-                <td>#{{ run.runNumber }}</td>
+                <!-- FIX #1 : guard sur period avant formatPeriod -->
+                <td>{{ run?.period ? formatPeriod(run.period) : '—' }}</td>
+                <td>#{{ run?.runNumber ?? '—' }}</td>
                 <td>
                   <span class="badge" [ngClass]="getStatusClass(run.status)">
                     {{ run.status }}
                   </span>
                 </td>
-                <td>{{ run.employeeCount }}</td>
-                <td>{{ run.totalGross | number:'1.2-2' }} MAD</td>
-                <td class="net-amount">{{ run.totalNet | number:'1.2-2' }} MAD</td>
-                <td>{{ run.employerContributions | number:'1.2-2' }} MAD</td>
+                <td>{{ run.employeeCount ?? 0 }}</td>
+                <td>{{ (run.totalGross ?? 0) | number:'1.2-2' }} MAD</td>
+                <td class="net-amount">{{ (run.totalNet ?? 0) | number:'1.2-2' }} MAD</td>
+                <td>{{ (run.employerContributions ?? 0) | number:'1.2-2' }} MAD</td>
                 <td class="actions-cell">
                   <!-- Calculer / Voir détail -->
                   <button
                     class="action-btn btn-calculate"
-                    [title]="run.status === 'COMPLETED' ? 'Voir les bulletins' : 'Calculer'"
+                    [title]="run.status === 'COMPLETED' || run.status === 'LOCKED' ? 'Voir les bulletins' : 'Calculer'"
                     (click)="handlePrimary(run)">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <rect x="4" y="2" width="16" height="20" rx="2"/>
@@ -95,7 +96,7 @@ import { PayrollConfigWarningComponent } from '../config/warning.component';
                   <button
                     class="action-btn btn-edit"
                     title="Modifier"
-                    [disabled]="run.status === 'LOCKED'"
+                    [disabled]="run.status === 'LOCKED' || run.status === 'COMPLETED'"
                     (click)="editRun(run)">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -144,6 +145,26 @@ import { PayrollConfigWarningComponent } from '../config/warning.component';
           <button class="btn-secondary" (click)="closeCreateDialog()">Annuler</button>
           <button class="btn-primary" [disabled]="!newPeriod || creating" (click)="createRun()">
             {{ creating ? 'Création...' : 'Créer' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal éditer run -->
+    <div class="modal-overlay" *ngIf="showEditModal" (click)="closeEditDialog()">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>Modifier l'exécution #{{ editingRun?.runNumber }}</h2>
+          <button class="modal-close" (click)="closeEditDialog()">✕</button>
+        </div>
+        <div class="modal-body">
+          <label>Période (mois/année)</label>
+          <input type="month" [(ngModel)]="editPeriod" class="form-input">
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" (click)="closeEditDialog()">Annuler</button>
+          <button class="btn-primary" [disabled]="!editPeriod || saving" (click)="saveEdit()">
+            {{ saving ? 'Enregistrement...' : 'Enregistrer' }}
           </button>
         </div>
       </div>
@@ -276,11 +297,19 @@ export class PayrollRunsComponent implements OnInit, OnDestroy {
   filteredRuns: PayrollRun[] = [];
   loading = false;
   searchTerm = '';
+
+  // Modal créer
   showCreateModal = false;
   newPeriod = '';
   creating = false;
-  configLoaded = false;
 
+  // Modal éditer
+  showEditModal = false;
+  editingRun: PayrollRun | null = null;
+  editPeriod = '';
+  saving = false;
+
+  configLoaded = false;
   missingRates: string[] = [];
   missingBrackets: TaxBracket[] = [];
   todayStr = new Date().toISOString().split('T')[0];
@@ -299,19 +328,31 @@ export class PayrollRunsComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
+  // ─── Chargement ────────────────────────────────────────────
+
   loadRuns(): void {
     this.loading = true;
     this.payrollSvc.getPayrollRuns()
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (runs) => { this.runs = runs; this.filteredRuns = runs; this.loading = false; },
-        error: () => { this.loading = false; }
+        next: (res: any) => {
+          // Backend peut retourner [] ou { data: [] }
+          const runs: PayrollRun[] = Array.isArray(res) ? res : (res?.data ?? []);
+          this.runs = runs;
+          this.filteredRuns = runs;
+          this.loading = false;
+        },
+        error: (err) => {
+          console.error('Erreur chargement runs:', err);
+          this.runs = [];
+          this.filteredRuns = [];
+          this.loading = false;
+        }
       });
   }
 
   checkPayrollConfig(): void {
-    const today = this.todayStr;
-    this.payrollSvc.loadPayrollConfig(today)
+    this.payrollSvc.loadPayrollConfig(this.todayStr)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: ({ rates, brackets }) => {
@@ -319,57 +360,108 @@ export class PayrollRunsComponent implements OnInit, OnDestroy {
           const requiredCodes = ['CNSS_EMPLOYEE', 'CNSS_EMPLOYER', 'AMO_EMPLOYEE', 'AMO_EMPLOYER'];
           const foundCodes = rates.filter(r => r.isActive).map(r => r.code);
           this.missingRates = requiredCodes.filter(c => !foundCodes.includes(c));
-          this.missingBrackets = brackets.filter(b => b.isActive).length === 0 ? [] : [];
-          // Si aucun barème IR actif → avertissement
-          if (brackets.filter(b => b.isActive).length === 0) {
-            this.missingBrackets = [{ code: 'IR_SALAIRE' } as TaxBracket];
-          }
+          const activeBrackets = brackets.filter(b => b.isActive);
+          this.missingBrackets = activeBrackets.length === 0
+            ? [{ code: 'IR_SALAIRE' } as TaxBracket]
+            : [];
         },
-        error: () => {
-          // API injoignable, on n'affiche pas d'erreur bloquante
-          this.configLoaded = false;
-        }
+        error: () => { this.configLoaded = false; }
       });
   }
+
+  // ─── Filtrage ──────────────────────────────────────────────
 
   applyFilter(): void {
     const term = this.searchTerm.toLowerCase();
     this.filteredRuns = this.runs.filter(r =>
-      r.period.includes(term) || `#${r.runNumber}`.includes(term) || r.status.toLowerCase().includes(term)
+      (r.period ?? '').includes(term) ||
+      `#${r.runNumber ?? ''}`.includes(term) ||
+      (r.status ?? '').toLowerCase().includes(term)
     );
   }
 
-  formatPeriod(period: string): string {
-    const [year, month] = period.split('-');
-    return `${month}/${year}`;
+  // ─── Formatage ─────────────────────────────────────────────
+
+  formatPeriod(period: string | undefined | null): string {
+    if (!period) return '—';
+    const parts = period.split('-');
+    if (parts.length < 2) return period;
+    const [year, month] = parts;
+    const months = [
+      'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+      'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+    ];
+    const idx = parseInt(month, 10) - 1;
+    return `${months[idx] ?? month} ${year}`;
   }
 
   getStatusClass(status: string): string {
     const map: Record<string, string> = {
-      DRAFT: 'badge-draft', PROCESSING: 'badge-processing',
-      COMPLETED: 'badge-completed', LOCKED: 'badge-locked', ERROR: 'badge-error'
+      DRAFT: 'badge-draft',
+      PROCESSING: 'badge-processing',
+      COMPLETED: 'badge-completed',
+      LOCKED: 'badge-locked',
+      ERROR: 'badge-error'
     };
     return map[status] || 'badge-draft';
   }
 
+  // ─── Actions ───────────────────────────────────────────────
+
+  // FIX #2 : navigate vers la bonne page selon statut
   handlePrimary(run: PayrollRun): void {
-    if (run.status === 'DRAFT') {
-      this.router.navigate(['/payroll/runs', run.id, 'calculate']);
-    } else {
+    if (run.status === 'COMPLETED' || run.status === 'LOCKED') {
       this.router.navigate(['/payroll/runs', run.id, 'payslips']);
+    } else {
+      // DRAFT ou ERROR → page calcul
+      this.router.navigate(['/payroll/runs', run.id, 'calculate']);
     }
   }
 
+  // FIX #3 : edit → modal inline (pas de navigate vers route inexistante)
   editRun(run: PayrollRun): void {
-    this.router.navigate(['/payroll/runs', run.id, 'edit']);
+    this.editingRun = run;
+    // Convertir la période stockée 'YYYY-MM' pour l'input type="month"
+    this.editPeriod = run.period ?? '';
+    this.showEditModal = true;
+  }
+
+  closeEditDialog(): void {
+    this.showEditModal = false;
+    this.editingRun = null;
+    this.editPeriod = '';
+  }
+
+  saveEdit(): void {
+    if (!this.editingRun || !this.editPeriod) return;
+    this.saving = true;
+    // Appel PATCH/PUT sur le run
+    this.payrollSvc.updatePayrollRun(this.editingRun.id, { period: this.editPeriod })
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.saving = false;
+          this.closeEditDialog();
+          this.loadRuns();
+        },
+        error: (err) => {
+          console.error('Erreur modification run:', err);
+          this.saving = false;
+        }
+      });
   }
 
   deleteRun(run: PayrollRun): void {
     if (!confirm(`Supprimer l'exécution #${run.runNumber} ?`)) return;
     this.payrollSvc.deletePayrollRun(run.id)
       .pipe(takeUntil(this.destroy$))
-      .subscribe(() => this.loadRuns());
+      .subscribe({
+        next: () => this.loadRuns(),
+        error: (err) => console.error('Erreur suppression:', err)
+      });
   }
+
+  // ─── Modal créer ───────────────────────────────────────────
 
   openCreateDialog(): void {
     const now = new Date();
@@ -377,22 +469,28 @@ export class PayrollRunsComponent implements OnInit, OnDestroy {
     this.showCreateModal = true;
   }
 
-  closeCreateDialog(): void { this.showCreateModal = false; }
+  closeCreateDialog(): void {
+    this.showCreateModal = false;
+    this.newPeriod = '';
+  }
 
   createRun(): void {
     if (!this.newPeriod) return;
     this.creating = true;
-    const period = this.newPeriod.replace('-', '-'); // YYYY-MM
-    this.payrollSvc.createPayrollRun(period)
+    this.payrollSvc.createPayrollRun(this.newPeriod)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (run) => {
           this.creating = false;
           this.closeCreateDialog();
           this.loadRuns();
+          // Navigate vers calcul après création
           this.router.navigate(['/payroll/runs', run.id, 'calculate']);
         },
-        error: () => { this.creating = false; }
+        error: (err) => {
+          console.error('Erreur création run:', err);
+          this.creating = false;
+        }
       });
   }
 

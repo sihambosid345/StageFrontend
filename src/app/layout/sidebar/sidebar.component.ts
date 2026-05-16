@@ -52,11 +52,12 @@ export class SidebarComponent {
         { label: 'Configuration', icon: 'bi-gear-fill',                  route: '/payroll/config',   permission: 'payroll' },
 
         { label: 'Périodes',       icon: 'bi-calendar3',                    route: '/payroll/periods',  permission: 'payroll' },
+        { label: 'Taux statutaires',  icon: 'bi-percent',                      route: '/payroll/statutory-rates', permission: 'payroll' },
+        { label: 'Barème IR',          icon: 'bi-bar-chart-steps',              route: '/payroll/tax-brackets',    permission: 'payroll' },
         { label: 'Exécutions',     icon: 'bi-play-circle-fill',             route: '/payroll/runs',     permission: 'payroll' },
         { label: 'Lignes de paie', icon: 'bi-list-columns',                 route: '/payroll/items',    permission: 'payroll' },
         { label: 'Bulletins',         icon: 'bi-file-earmark-richtext-fill',   route: '/payroll/payslips',        permission: 'payroll' },
-        { label: 'Taux statutaires',  icon: 'bi-percent',                      route: '/payroll/statutory-rates', permission: 'payroll' },
-        { label: 'Barème IR',          icon: 'bi-bar-chart-steps',              route: '/payroll/tax-brackets',    permission: 'payroll' },
+        
 
       ]
     },

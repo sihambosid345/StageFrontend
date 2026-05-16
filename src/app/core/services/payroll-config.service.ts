@@ -208,4 +208,9 @@ export class PayrollService {
       brackets: this.getTaxBrackets('IR_SALAIRE', date)
     });
   }
+
+
+  updatePayrollRun(id: string, data: Partial<{ period: string }>): Observable<PayrollRun> {
+  return this.http.patch<PayrollRun>(`${this.api}/payroll/runs/${id}`, data);
+}
 }
