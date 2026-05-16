@@ -13,6 +13,7 @@ export interface StatutoryRate {
   effectiveTo?: string;
   version: number;
   isActive: boolean;
+  companyId?: string | null;
 }
 
 export interface TaxBracket {
@@ -26,6 +27,7 @@ export interface TaxBracket {
   effectiveTo?: string;
   version: number;
   isActive: boolean;
+  companyId?: string | null;
 }
 
 export interface PayrollRun {
@@ -96,9 +98,10 @@ export class PayrollService {
 
   // ─── STATUTORY RATES ───────────────────────────────────────────────────────
 
-  getStatutoryRates(date?: string): Observable<StatutoryRate[]> {
+  getStatutoryRates(date?: string, companyId?: string): Observable<StatutoryRate[]> {
     let params = new HttpParams();
     if (date) params = params.set('date', date);
+    if (companyId) params = params.set('companyId', companyId);
     return this.http.get<StatutoryRate[]>(`${this.api}/payroll/statutory-rates`, { params });
   }
 
@@ -122,9 +125,10 @@ export class PayrollService {
 
   // ─── TAX BRACKETS ──────────────────────────────────────────────────────────
 
-  getTaxBrackets(code: string = 'IR_SALAIRE', date?: string): Observable<TaxBracket[]> {
+  getTaxBrackets(code: string = 'IR_SALAIRE', date?: string, companyId?: string): Observable<TaxBracket[]> {
     let params = new HttpParams().set('code', code);
     if (date) params = params.set('date', date);
+    if (companyId) params = params.set('companyId', companyId);
     return this.http.get<TaxBracket[]>(`${this.api}/payroll/tax-brackets`, { params });
   }
 

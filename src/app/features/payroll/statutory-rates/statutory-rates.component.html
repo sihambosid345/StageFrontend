@@ -5,7 +5,7 @@
   <div class="pr-page__header">
     <div>
       <h1 class="pr-page__title">Taux Réglementaires</h1>
-      <p class="pr-page__subtitle">CNSS · AMO · CIMR — Taux dynamiques depuis la base de données</p>
+      <p class="pr-page__subtitle">CNSS · AMO · CIMR · Taux dynamiques depuis la base de données</p>
     </div>
     <div class="pr-page__actions">
       <button class="btn btn--ghost btn--sm" (click)="seedRates()" [disabled]="seeding">
@@ -20,6 +20,19 @@
         <span class="icon">+</span> Nouveau taux
       </button>
     </div>
+  </div>
+
+  <!-- Super Admin : barre de filtre par entreprise -->
+  <div class="company-filter-bar" *ngIf="isSuperAdmin">
+    <span class="sa-badge">🔑 SUPER ADMIN</span>
+    <label>Filtrer par entreprise :</label>
+    <select (change)="onFilterCompanyChange($event)">
+      <option value="">— Tous (taux nationaux) —</option>
+      <option *ngFor="let c of companies" [value]="c.id">{{ c.name }}</option>
+    </select>
+    <span style="color:#3b82f6;font-size:0.8rem">
+      {{ selectedFilterCompanyId ? 'Taux de l\'entreprise sélectionnée' : 'Taux nationaux (companyId = null)' }}
+    </span>
   </div>
 
   <!-- Alerts -->
@@ -69,7 +82,9 @@
         <table class="pr-table pr-table--compact">
           <thead>
             <tr>
-              <th>Taux</th><th>Plafond</th><th>Du</th><th>Au</th><th>Version</th><th>Statut</th>
+              <th>Taux</th><th>Plafond</th><th>Du</th><th>Au</th>
+              <th *ngIf="isSuperAdmin">Entreprise</th>
+              <th>Version</th><th>Statut</th>
             </tr>
           </thead>
           <tbody>
@@ -78,6 +93,9 @@
               <td>{{ r.ceiling ? ((r.ceiling | number:'1.0-0') + ' MAD') : '—' }}</td>
               <td>{{ r.effectiveFrom | date:'dd/MM/yyyy' }}</td>
               <td>{{ r.effectiveTo ? (r.effectiveTo | date:'dd/MM/yyyy') : '∞' }}</td>
+              <td *ngIf="isSuperAdmin" style="font-size:0.78rem;color:#6b7280">
+                {{ getCompanyName(r.companyId) }}
+              </td>
               <td><span class="version-badge">{{ getVersionBadge(r) }}</span></td>
               <td>
                 <span class="status-chip"
@@ -103,6 +121,17 @@
 
     <form [formGroup]="form" (ngSubmit)="save()" class="pr-form">
       <div class="alert alert--error" *ngIf="errorMessage">⚠️ {{ errorMessage }}</div>
+
+      <!-- ✅ Sélecteur d'entreprise — visible UNIQUEMENT pour le SUPER_ADMIN -->
+      <div class="pr-form__field company-field" *ngIf="isSuperAdmin">
+        <label>🏢 Entreprise * <span class="sa-badge" style="margin-left:0.4rem">SUPER ADMIN</span></label>
+        <select formControlName="companyId"
+                [class.invalid]="!form.get('companyId')?.value && form.touched">
+          <option [value]="null">— Sélectionner une entreprise —</option>
+          <option *ngFor="let c of companies" [value]="c.id">{{ c.name }}</option>
+        </select>
+        <small style="color:#7c3aed">Ce taux sera associé à l'entreprise sélectionnée</small>
+      </div>
 
       <div class="pr-form__row pr-form__row--2">
         <div class="pr-form__field">

@@ -1,6 +1,8 @@
 // ============================================================
-// tax-brackets.component.ts  (rewritten — standalone)
+// tax-brackets.component.ts
 // Barème IR progressif — CRUD par exercice fiscal
+// SUPER_ADMIN : sélecteur d'entreprise dans le formulaire + filtre
+// ADMIN / Utilisateur : voit uniquement les données de sa propre entreprise
 // ============================================================
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
@@ -8,6 +10,9 @@ import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angula
 import { Subject } from 'rxjs';
 import { takeUntil, finalize } from 'rxjs/operators';
 import { PayrollService, TaxBracket } from '../../../core/services/payroll-config.service';
+import { AuthService } from '../../../core/services/auth.service';
+import { CompanyService } from '../../../core/services/domain.services';
+import { Company } from '../../../core/models';
 
 @Component({
   selector: 'app-tax-brackets',
@@ -22,8 +27,7 @@ import { PayrollService, TaxBracket } from '../../../core/services/payroll-confi
         </div>
         <div style="display:flex;gap:0.5rem">
           <button class="btn-secondary" (click)="seedBrackets()" [disabled]="seeding"
-                  style="background:#fef3c7;color:#92400e;border-color:#fcd34d"
-                  title="Initialiser le barème IR marocain 2026">
+                  style="background:#fef3c7;color:#92400e;border-color:#fcd34d">
             {{ seeding ? 'Initialisation...' : '⚡ Initialiser barème' }}
           </button>
           <button class="btn-primary" (click)="openCreate()">
@@ -32,12 +36,41 @@ import { PayrollService, TaxBracket } from '../../../core/services/payroll-confi
         </div>
       </div>
 
+      <!-- Super Admin : filtre par entreprise -->
+      <div class="company-filter-bar" *ngIf="isSuperAdmin">
+        <span class="sa-badge">🔑 SUPER ADMIN</span>
+        <label>Filtrer par entreprise :</label>
+        <select (change)="onFilterCompanyChange($event)">
+          <option value="">— Tous (barème national) —</option>
+          <option *ngFor="let c of companies" [value]="c.id">{{ c.name }}</option>
+        </select>
+        <span style="color:#3b82f6;font-size:0.8rem">
+          {{ selectedFilterCompanyId ? 'Barème de l\'entreprise sélectionnée' : 'Barème national' }}
+        </span>
+      </div>
+
       <div *ngIf="errorMessage" class="alert alert-error">{{ errorMessage }}</div>
       <div *ngIf="successMessage" class="alert alert-success">{{ successMessage }}</div>
 
+      <!-- Formulaire (inline, pas de modal pour ce composant) -->
       <div *ngIf="editMode" class="card form-card">
         <h2>{{ selectedBracket ? 'Modifier la tranche' : 'Nouvelle tranche' }}</h2>
         <form [formGroup]="form" (ngSubmit)="save()">
+
+          <!-- ✅ Sélecteur d'entreprise — visible UNIQUEMENT pour le SUPER_ADMIN -->
+          <div class="form-group company-field" *ngIf="isSuperAdmin" style="margin-bottom:1rem">
+            <label style="color:#5b21b6;font-weight:600">
+              🏢 Entreprise *
+              <span class="sa-badge" style="margin-left:0.4rem">SUPER ADMIN</span>
+            </label>
+            <select formControlName="companyId" class="form-control"
+                    style="border-color:#7c3aed;background:#f5f3ff">
+              <option [value]="null">— Sélectionner une entreprise —</option>
+              <option *ngFor="let c of companies" [value]="c.id">{{ c.name }}</option>
+            </select>
+            <small style="color:#7c3aed;font-size:0.75rem">Ce barème sera associé à l'entreprise sélectionnée</small>
+          </div>
+
           <div class="form-grid">
             <div class="form-group">
               <label>Montant minimum (MAD)</label>
@@ -82,6 +115,7 @@ import { PayrollService, TaxBracket } from '../../../core/services/payroll-confi
               <th>Taux</th>
               <th>Déduction</th>
               <th>Date d'effet</th>
+              <th *ngIf="isSuperAdmin">Entreprise</th>
               <th>Statut</th>
               <th>Actions</th>
             </tr>
@@ -92,6 +126,9 @@ import { PayrollService, TaxBracket } from '../../../core/services/payroll-confi
               <td>{{ (b.rate * 100).toFixed(0) }} %</td>
               <td>{{ b.deduction.toLocaleString('fr-MA') }} MAD</td>
               <td>{{ b.effectiveFrom | date:'dd/MM/yyyy' }}</td>
+              <td *ngIf="isSuperAdmin" style="font-size:0.78rem;color:#6b7280">
+                {{ getCompanyName(b.companyId) }}
+              </td>
               <td>
                 <span [class]="b.isActive ? 'badge-active' : 'badge-inactive'">
                   {{ b.isActive ? 'Actif' : 'Inactif' }}
@@ -103,7 +140,7 @@ import { PayrollService, TaxBracket } from '../../../core/services/payroll-confi
               </td>
             </tr>
             <tr *ngIf="brackets.length === 0">
-              <td colspan="6" class="empty-state">Aucune tranche configurée.</td>
+              <td [attr.colspan]="isSuperAdmin ? 7 : 6" class="empty-state">Aucune tranche configurée.</td>
             </tr>
           </tbody>
         </table>
@@ -119,7 +156,7 @@ import { PayrollService, TaxBracket } from '../../../core/services/payroll-confi
     .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
     .form-group { display: flex; flex-direction: column; gap: 0.25rem; }
     .form-group label { font-size: 0.875rem; font-weight: 500; }
-    .form-control { border: 1px solid #d1d5db; border-radius: 6px; padding: 0.5rem 0.75rem; font-size: 0.875rem; }
+    .form-control { border: 1px solid #d1d5db; border-radius: 6px; padding: 0.5rem 0.75rem; font-size: 0.875rem; width: 100%; box-sizing: border-box; }
     .hint { font-weight: 400; color: #9ca3af; font-size: 0.75rem; }
     .form-actions { display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1rem; }
     .btn-primary { background: #4f46e5; color: white; border: none; border-radius: 6px; padding: 0.5rem 1rem; cursor: pointer; font-size: 0.875rem; }
@@ -135,6 +172,11 @@ import { PayrollService, TaxBracket } from '../../../core/services/payroll-confi
     .alert-success { background: #d1fae5; color: #065f46; }
     .loading-state, .empty-state { text-align: center; color: #9ca3af; padding: 2rem; }
     .btn-icon-edit, .btn-icon-delete { background: none; border: none; cursor: pointer; padding: 0.25rem; }
+    /* Super Admin */
+    .company-filter-bar { display: flex; align-items: center; gap: 0.75rem; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.875rem; flex-wrap: wrap; }
+    .company-filter-bar label { font-weight: 600; color: #1e40af; white-space: nowrap; }
+    .company-filter-bar select { border: 1px solid #93c5fd; border-radius: 6px; padding: 0.35rem 0.65rem; font-size: 0.875rem; color: #1e3a8a; background: white; flex: 1; min-width: 200px; max-width: 320px; }
+    .sa-badge { display: inline-flex; align-items: center; gap: 0.3rem; background: #ede9fe; color: #5b21b6; border-radius: 4px; padding: 0.15rem 0.5rem; font-size: 0.7rem; font-weight: 700; letter-spacing: .05em; }
   `]
 })
 export class TaxBracketsComponent implements OnInit, OnDestroy {
@@ -144,19 +186,37 @@ export class TaxBracketsComponent implements OnInit, OnDestroy {
   saving = false;
   editMode = false;
   selectedBracket?: TaxBracket;
-
   seeding = false;
   form!: FormGroup;
   errorMessage = '';
   successMessage = '';
 
+  isSuperAdmin = false;
+  companies: Company[] = [];
+  selectedFilterCompanyId: string | null = null;
+
   private destroy$ = new Subject<void>();
 
-  constructor(private payrollSvc: PayrollService, private fb: FormBuilder) {}
+  constructor(
+    private payrollSvc: PayrollService,
+    private fb: FormBuilder,
+    private auth: AuthService,
+    private companySvc: CompanyService
+  ) {}
 
   ngOnInit(): void {
+    this.isSuperAdmin = this.auth.isSuperAdmin();
     this.buildForm();
-    this.loadBrackets();
+    if (this.isSuperAdmin) {
+      this.companySvc.getAll()
+        .pipe(takeUntil(this.destroy$))
+        .subscribe({
+          next: (companies) => { this.companies = companies; this.loadBrackets(); },
+          error: () => this.loadBrackets()
+        });
+    } else {
+      this.loadBrackets();
+    }
   }
 
   ngOnDestroy(): void {
@@ -166,6 +226,7 @@ export class TaxBracketsComponent implements OnInit, OnDestroy {
 
   private buildForm(): void {
     this.form = this.fb.group({
+      companyId:     [null],
       minAmount:     [null, [Validators.required, Validators.min(0)]],
       maxAmount:     [null],
       rate:          [null, [Validators.required, Validators.min(0), Validators.max(1)]],
@@ -173,6 +234,17 @@ export class TaxBracketsComponent implements OnInit, OnDestroy {
       effectiveFrom: ['',   Validators.required],
       effectiveTo:   [''],
     });
+  }
+
+  onFilterCompanyChange(event: Event): void {
+    const val = (event.target as HTMLSelectElement).value;
+    this.selectedFilterCompanyId = val || null;
+    this.loadBrackets();
+  }
+
+  getCompanyName(companyId: string | null | undefined): string {
+    if (!companyId) return '—';
+    return this.companies.find(c => c.id === companyId)?.name ?? companyId;
   }
 
   seedBrackets(): void {
@@ -192,11 +264,12 @@ export class TaxBracketsComponent implements OnInit, OnDestroy {
 
   loadBrackets(): void {
     this.loading = true;
-    this.payrollSvc.getTaxBrackets()
+    const companyId = this.isSuperAdmin ? (this.selectedFilterCompanyId ?? undefined) : undefined;
+    this.payrollSvc.getTaxBrackets('IR_SALAIRE', undefined, companyId)
       .pipe(takeUntil(this.destroy$), finalize(() => this.loading = false))
       .subscribe({
         next: (brackets: TaxBracket[]) => {
-          this.brackets = brackets.sort((a: TaxBracket, b: TaxBracket) => a.minAmount - b.minAmount);
+          this.brackets = brackets.sort((a, b) => a.minAmount - b.minAmount);
         },
         error: (err: Error) => { this.errorMessage = err.message; }
       });
@@ -205,13 +278,18 @@ export class TaxBracketsComponent implements OnInit, OnDestroy {
   openCreate(): void {
     this.selectedBracket = undefined;
     this.editMode = true;
-    this.form.reset({ deduction: 0, effectiveFrom: new Date().toISOString().substring(0, 10) });
+    this.form.reset({
+      companyId:     this.isSuperAdmin ? (this.selectedFilterCompanyId ?? null) : null,
+      deduction: 0,
+      effectiveFrom: new Date().toISOString().substring(0, 10)
+    });
   }
 
   openEdit(bracket: TaxBracket): void {
     this.selectedBracket = bracket;
     this.editMode = true;
     this.form.patchValue({
+      companyId:     bracket.companyId ?? null,
       minAmount:     bracket.minAmount,
       maxAmount:     bracket.maxAmount ?? null,
       rate:          bracket.rate,
@@ -230,10 +308,21 @@ export class TaxBracketsComponent implements OnInit, OnDestroy {
 
   save(): void {
     if (this.form.invalid) { this.form.markAllAsTouched(); return; }
+    if (this.isSuperAdmin && !this.form.value.companyId) {
+      this.errorMessage = 'Veuillez sélectionner une entreprise.';
+      return;
+    }
     this.saving = true;
-    const payload: Partial<TaxBracket> = { ...this.form.value };
-    if (!payload.maxAmount) payload.maxAmount = undefined;
-    if (!payload.effectiveTo) payload.effectiveTo = undefined;
+    const v = this.form.value;
+    const payload: any = {
+      minAmount:     v.minAmount,
+      maxAmount:     v.maxAmount || undefined,
+      rate:          v.rate,
+      deduction:     v.deduction,
+      effectiveFrom: v.effectiveFrom,
+      effectiveTo:   v.effectiveTo || undefined,
+    };
+    if (this.isSuperAdmin && v.companyId) { payload.companyId = v.companyId; }
 
     const obs = this.selectedBracket
       ? this.payrollSvc.updateTaxBracket(this.selectedBracket.id, payload)
