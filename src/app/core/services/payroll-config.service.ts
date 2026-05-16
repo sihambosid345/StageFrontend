@@ -2,7 +2,6 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, forkJoin } from 'rxjs';
 import { map } from 'rxjs/operators';
-import { environment } from '../../../environments/environment';
 
 export interface StatutoryRate {
   id: string;
@@ -91,7 +90,7 @@ export interface PayrollCalculationResult {
 
 @Injectable({ providedIn: 'root' })
 export class PayrollService {
-  private api = environment.apiUrl;
+  private api = 'http://localhost:3000';
 
   constructor(private http: HttpClient) {}
 
@@ -139,6 +138,16 @@ export class PayrollService {
 
   deleteTaxBracket(id: string): Observable<void> {
     return this.http.delete<void>(`${this.api}/payroll/tax-brackets/${id}`);
+  }
+
+  // ─── SEED (initialisation des taux légaux marocains) ──────────────────────
+
+  seedStatutoryRates(): Observable<{ message: string; created: number }> {
+    return this.http.post<{ message: string; created: number }>(`${this.api}/payroll/statutory-rates/seed`, {});
+  }
+
+  seedTaxBrackets(): Observable<{ message: string; created: number }> {
+    return this.http.post<{ message: string; created: number }>(`${this.api}/payroll/tax-brackets/seed`, {});
   }
 
   // ─── PAYROLL RUNS ──────────────────────────────────────────────────────────

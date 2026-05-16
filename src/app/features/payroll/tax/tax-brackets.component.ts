@@ -20,9 +20,16 @@ import { PayrollService, TaxBracket } from '../../../core/services/payroll-confi
           <h1 class="page-title">Barème IR</h1>
           <p class="page-subtitle">Gestion des tranches de l'impôt sur le revenu</p>
         </div>
-        <button class="btn-primary" (click)="openCreate()">
-          <span class="btn-icon">+</span> Ajouter une tranche
-        </button>
+        <div style="display:flex;gap:0.5rem">
+          <button class="btn-secondary" (click)="seedBrackets()" [disabled]="seeding"
+                  style="background:#fef3c7;color:#92400e;border-color:#fcd34d"
+                  title="Initialiser le barème IR marocain 2026">
+            {{ seeding ? 'Initialisation...' : '⚡ Initialiser barème' }}
+          </button>
+          <button class="btn-primary" (click)="openCreate()">
+            <span class="btn-icon">+</span> Ajouter une tranche
+          </button>
+        </div>
       </div>
 
       <div *ngIf="errorMessage" class="alert alert-error">{{ errorMessage }}</div>
@@ -138,6 +145,7 @@ export class TaxBracketsComponent implements OnInit, OnDestroy {
   editMode = false;
   selectedBracket?: TaxBracket;
 
+  seeding = false;
   form!: FormGroup;
   errorMessage = '';
   successMessage = '';
@@ -165,6 +173,21 @@ export class TaxBracketsComponent implements OnInit, OnDestroy {
       effectiveFrom: ['',   Validators.required],
       effectiveTo:   [''],
     });
+  }
+
+  seedBrackets(): void {
+    if (!confirm('Initialiser le barème IR marocain 2026 par défaut ? Les tranches existantes ne seront pas modifiées.')) return;
+    this.seeding = true;
+    this.payrollSvc.seedTaxBrackets()
+      .pipe(takeUntil(this.destroy$), finalize(() => this.seeding = false))
+      .subscribe({
+        next: (res) => {
+          this.successMessage = res.message;
+          this.loadBrackets();
+          setTimeout(() => this.successMessage = '', 4000);
+        },
+        error: (err: Error) => { this.errorMessage = err.message; }
+      });
   }
 
   loadBrackets(): void {

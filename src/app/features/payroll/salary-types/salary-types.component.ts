@@ -3,7 +3,6 @@ import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Subject, takeUntil } from 'rxjs';
-import { environment } from '../../../../environments/environment';
 
 interface SalaryTypeConfig {
   id: string;
@@ -85,7 +84,7 @@ interface SalaryTypeConfig {
                 <td>{{ config.employeeName }}</td>
                 <td><span class="code-badge">{{ config.contractCode }}</span></td>
                 <td>
-                  <span class="type-badge" [class]="'type-' + config.salaryCalculationType.toLowerCase()">
+                  <span class="type-badge" [class]="'type-' + config.salaryCalculationType?.toLowerCase()">
                     {{ config.salaryCalculationType }}
                   </span>
                 </td>
@@ -320,7 +319,7 @@ export class SalaryTypesComponent implements OnInit, OnDestroy {
 
   loadConfigs() {
     this.loading = true;
-    this.http.get<SalaryTypeConfig[]>(`${environment.apiUrl}/payroll/salary-types`)
+    this.http.get<SalaryTypeConfig[]>(`http://localhost:3000/payroll/salary-types`)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (data) => {
@@ -336,7 +335,7 @@ export class SalaryTypesComponent implements OnInit, OnDestroy {
   }
 
   loadEmployees() {
-    this.http.get<any[]>(`${environment.apiUrl}/employees`)
+    this.http.get<any[]>(`http://localhost:3000/employees`)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (data) => {
@@ -427,8 +426,8 @@ export class SalaryTypesComponent implements OnInit, OnDestroy {
     const data = this.form.value;
 
     const request = this.editingConfig
-      ? this.http.put(`${environment.apiUrl}/payroll/salary-types/${this.editingConfig.id}`, data)
-      : this.http.post(`${environment.apiUrl}/payroll/salary-types`, data);
+      ? this.http.put(`http://localhost:3000/payroll/salary-types/${this.editingConfig.id}`, data)
+      : this.http.post(`http://localhost:3000/payroll/salary-types`, data);
 
     request.pipe(takeUntil(this.destroy$)).subscribe({
       next: () => {
@@ -447,7 +446,7 @@ export class SalaryTypesComponent implements OnInit, OnDestroy {
   deleteConfig(config: SalaryTypeConfig) {
     if (!confirm(`Supprimer la configuration de ${config.employeeName} ?`)) return;
 
-    this.http.delete(`${environment.apiUrl}/payroll/salary-types/${config.id}`)
+    this.http.delete(`http://localhost:3000/payroll/salary-types/${config.id}`)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {

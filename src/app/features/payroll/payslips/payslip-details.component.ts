@@ -3,7 +3,6 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { Subject, takeUntil } from 'rxjs';
-import { environment } from '../../../../environments/environment';
 
 interface PayslipDetail {
   id: string;
@@ -111,7 +110,7 @@ interface Contribution {
             </div>
             <div class="header-item">
               <span class="label">Type de Salaire</span>
-              <span class="value badge" [class]="'salary-' + payslip.salaryType.toLowerCase()">{{ payslip.salaryType }}</span>
+              <span class="value badge" [class]="'salary-' + payslip.salaryType?.toLowerCase()">{{ payslip.salaryType }}</span>
             </div>
           </div>
         </div>
@@ -411,7 +410,7 @@ export class PayslipDetailsComponent implements OnInit, OnDestroy {
 
   loadPayslip() {
     this.loading = true;
-    this.http.get<PayslipDetail>(`${environment.apiUrl}/payroll/runs/${this.runId}/payslips/${this.payslipId}`)
+    this.http.get<PayslipDetail>(`http://localhost:3000/payroll/runs/${this.runId}/payslips/${this.payslipId}`)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (data) => {
@@ -442,7 +441,7 @@ export class PayslipDetailsComponent implements OnInit, OnDestroy {
 
   exportPdf() {
     if (!this.payslip) return;
-    window.location.href = `${environment.apiUrl}/payroll/runs/${this.runId}/payslips/${this.payslipId}/pdf`;
+    window.location.href = `http://localhost:3000/payroll/runs/${this.runId}/payslips/${this.payslipId}/pdf`;
   }
 
   goBack() {
