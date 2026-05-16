@@ -72,7 +72,7 @@ export const routes: Routes = [
       {
         path: 'payroll/runs',
         canActivate: [permissionGuard('payroll')],
-        loadComponent: () => import('./features/payroll/runs/runs.component').then(m => m.RunsComponent)
+        loadComponent: () => import('./features/payroll/runs/runs.component').then(m => m.PayrollRunsComponent)
       },
       {
         path: 'payroll/items',
@@ -83,6 +83,16 @@ export const routes: Routes = [
         path: 'payroll/payslips',
         canActivate: [permissionGuard('payroll')],
         loadComponent: () => import('./features/payroll/payslips/payslips.component').then(m => m.PayslipsComponent)
+      },
+      {
+        path: 'payroll/statutory-rates',
+        canActivate: [permissionGuard('payroll')],
+        loadComponent: () => import('./features/payroll/statutory-rates/statutory-rates.component').then(m => m.StatutoryRatesComponent)
+      },
+      {
+        path: 'payroll/tax-brackets',
+        canActivate: [permissionGuard('payroll')],
+        loadComponent: () => import('./features/payroll/tax/tax-brackets.component').then(m => m.TaxBracketsComponent)
       },
       {
         path: 'variable-items',

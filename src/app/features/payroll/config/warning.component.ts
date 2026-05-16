@@ -1,7 +1,7 @@
 import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
-import { TaxBracket } from '../../services/payroll.service';
+import { TaxBracket } from '../../../core/services/payroll-config.service';
 
 @Component({
   selector: 'app-payroll-config-warning',

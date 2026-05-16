@@ -1,14 +1,15 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
-import { PayrollService, PayrollRun, TaxBracket, StatutoryRate } from '../services/payroll.service';
-import { PayrollConfigWarningComponent } from './payroll-config-warning/payroll-config-warning.component';
+import { PayrollService, PayrollRun, TaxBracket, StatutoryRate } from '../../../core/services/payroll-config.service';
+import { PayrollConfigWarningComponent } from '../config/warning.component';
 
 @Component({
   selector: 'app-payroll-runs',
   standalone: true,
-  imports: [CommonModule, RouterModule, PayrollConfigWarningComponent],
+  imports: [CommonModule, RouterModule, FormsModule, PayrollConfigWarningComponent],
   template: `
     <div class="page-container">
       <!-- En-tête -->
