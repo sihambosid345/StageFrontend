@@ -110,7 +110,7 @@ interface Contribution {
             </div>
             <div class="header-item">
               <span class="label">Type de Salaire</span>
-              <span class="value badge" [class]="'salary-' + payslip.salaryType?.toLowerCase()">{{ payslip.salaryType }}</span>
+              <span class="value badge" [class]="'salary-' + payslip.salaryType.toLowerCase()">{{ payslip.salaryType }}</span>
             </div>
           </div>
         </div>

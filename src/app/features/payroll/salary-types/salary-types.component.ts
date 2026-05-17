@@ -84,7 +84,7 @@ interface SalaryTypeConfig {
                 <td>{{ config.employeeName }}</td>
                 <td><span class="code-badge">{{ config.contractCode }}</span></td>
                 <td>
-                  <span class="type-badge" [class]="'type-' + config.salaryCalculationType?.toLowerCase()">
+                  <span class="type-badge" [class]="'type-' + config.salaryCalculationType.toLowerCase()">
                     {{ config.salaryCalculationType }}
                   </span>
                 </td>
