@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
@@ -295,7 +295,8 @@ export class PayrollRunsComponent implements OnInit, OnDestroy {
     private payrollSvc: PayrollService,
     private auth: AuthService,
     private companySvc: CompanyService,
-    private router: Router
+    private router: Router,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
@@ -348,12 +349,14 @@ export class PayrollRunsComponent implements OnInit, OnDestroy {
           this.runs = runs;
           this.filteredRuns = runs;
           this.loading = false;
+          this.cdr.detectChanges();
         },
         error: (err) => {
           console.error('Erreur chargement runs:', err);
           this.runs = [];
           this.filteredRuns = [];
           this.loading = false;
+          this.cdr.detectChanges();
         }
       });
   }

@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PayslipService, EmployeeService, PayrollPeriodService, PayrollRunService, CompanyService } from '../../../core/services/domain.services';
@@ -47,7 +47,8 @@ export class PayslipsComponent implements OnInit {
     private periodService: PayrollPeriodService,
     private runService: PayrollRunService,
     private companySvc: CompanyService,
-    private auth: AuthService
+    private auth: AuthService,
+    private cdr: ChangeDetectorRef
   ) {}
 
   get canManagePayroll(): boolean {
@@ -99,8 +100,9 @@ export class PayslipsComponent implements OnInit {
           : all;
         this.applySearch();
         this.loading = false;
+        this.cdr.detectChanges();
       },
-      error: () => { this.loading = false; }
+      error: () => { this.loading = false; this.cdr.detectChanges(); }
     });
   }
 

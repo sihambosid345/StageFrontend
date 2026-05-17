@@ -3,7 +3,7 @@
 // SUPER_ADMIN : sélecteur d'entreprise dans le formulaire + filtre
 // ADMIN / Utilisateur : voit uniquement les données de sa propre entreprise
 // ============================================================
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule, DecimalPipe, DatePipe } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Subject } from 'rxjs';
@@ -134,7 +134,8 @@ export class StatutoryRatesComponent implements OnInit, OnDestroy {
     private payrollSvc: PayrollService,
     private fb: FormBuilder,
     private auth: AuthService,
-    private companySvc: CompanyService
+    private companySvc: CompanyService,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
@@ -181,10 +182,10 @@ export class StatutoryRatesComponent implements OnInit, OnDestroy {
     this.errorMessage = '';
     const companyId = this.isSuperAdmin ? (this.selectedFilterCompanyId ?? undefined) : undefined;
     this.payrollSvc.getStatutoryRates(undefined, companyId)
-      .pipe(takeUntil(this.destroy$), finalize(() => this.loading = false))
+      .pipe(takeUntil(this.destroy$), finalize(() => { this.loading = false; this.cdr.detectChanges(); }))
       .subscribe({
-        next: (rates: StatutoryRate[]) => this.buildRateGroups(rates),
-        error: (err: Error) => { this.errorMessage = err.message; }
+        next: (rates: StatutoryRate[]) => { this.buildRateGroups(rates); this.cdr.detectChanges(); },
+        error: (err: Error) => { this.errorMessage = err.message; this.cdr.detectChanges(); }
       });
   }
 

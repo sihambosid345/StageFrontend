@@ -30,7 +30,7 @@ export class SidebarComponent {
     {
       label: 'Organisation', icon: 'bi-building-fill', expanded: false,
       children: [
-        { label: 'Entreprises',  icon: 'bi-buildings',            route: '/companies',   permission: 'companies' },
+        { label: 'Entreprises',  icon: 'bi-buildings',            route: '/companies',   permission: 'superadmin_only' },
         { label: 'Départements', icon: 'bi-diagram-3-fill',       route: '/departments', permission: 'organisation' },
         { label: 'Postes',       icon: 'bi-briefcase-fill',       route: '/positions',   permission: 'organisation' },
         { label: 'Licences',     icon: 'bi-shield-fill-check',    route: '/licenses',    permission: 'licenses' },
@@ -72,13 +72,13 @@ export class SidebarComponent {
   isVisible(item: NavItem): boolean {
     if (item.children) {
       return item.children.some(c => {
-        if (c.permission === 'licenses') {
+        if (c.permission === 'licenses' || c.permission === 'superadmin_only') {
           return this.auth.isSuperAdmin();
         }
         return this.auth.hasPermission(c.permission ?? '');
       });
     }
-    if (item.permission === 'licenses') {
+    if (item.permission === 'licenses' || item.permission === 'superadmin_only') {
       return this.auth.isSuperAdmin();
     }
     return this.auth.hasPermission(item.permission ?? '');
@@ -87,7 +87,7 @@ export class SidebarComponent {
   visibleChildren(item: NavItem): NavItem[] {
     if (!item.children) return [];
     return item.children.filter(c => {
-      if (c.permission === 'licenses') {
+      if (c.permission === 'licenses' || c.permission === 'superadmin_only') {
         return this.auth.isSuperAdmin();
       }
       return this.auth.hasPermission(c.permission ?? '');

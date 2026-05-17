@@ -4,7 +4,7 @@
 // SUPER_ADMIN : sélecteur d'entreprise dans le formulaire + filtre
 // ADMIN / Utilisateur : voit uniquement les données de sa propre entreprise
 // ============================================================
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Subject } from 'rxjs';
@@ -45,7 +45,7 @@ import { Company } from '../../../core/models';
           <option *ngFor="let c of companies" [value]="c.id">{{ c.name }}</option>
         </select>
         <span style="color:#3b82f6;font-size:0.8rem">
-          {{ selectedFilterCompanyId ? 'Barème de l\'entreprise sélectionnée' : 'Barème national' }}
+          {{ filterLabel }}
         </span>
       </div>
 
@@ -201,7 +201,8 @@ export class TaxBracketsComponent implements OnInit, OnDestroy {
     private payrollSvc: PayrollService,
     private fb: FormBuilder,
     private auth: AuthService,
-    private companySvc: CompanyService
+    private companySvc: CompanyService,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
@@ -247,6 +248,10 @@ export class TaxBracketsComponent implements OnInit, OnDestroy {
     return this.companies.find(c => c.id === companyId)?.name ?? companyId;
   }
 
+  get filterLabel(): string {
+    return this.selectedFilterCompanyId ? "Barème de l'entreprise sélectionnée" : 'Barème national';
+  }
+
   seedBrackets(): void {
     if (!confirm('Initialiser le barème IR marocain 2026 par défaut ? Les tranches existantes ne seront pas modifiées.')) return;
     this.seeding = true;
@@ -266,12 +271,13 @@ export class TaxBracketsComponent implements OnInit, OnDestroy {
     this.loading = true;
     const companyId = this.isSuperAdmin ? (this.selectedFilterCompanyId ?? undefined) : undefined;
     this.payrollSvc.getTaxBrackets('IR_SALAIRE', undefined, companyId)
-      .pipe(takeUntil(this.destroy$), finalize(() => this.loading = false))
+      .pipe(takeUntil(this.destroy$), finalize(() => { this.loading = false; this.cdr.detectChanges(); }))
       .subscribe({
         next: (brackets: TaxBracket[]) => {
           this.brackets = brackets.sort((a, b) => a.minAmount - b.minAmount);
+          this.cdr.detectChanges();
         },
-        error: (err: Error) => { this.errorMessage = err.message; }
+        error: (err: Error) => { this.errorMessage = err.message; this.cdr.detectChanges(); }
       });
   }
 

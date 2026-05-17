@@ -1,23 +1,57 @@
 .modal-overlay {
+  isolation: isolate;
+
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0,0,0,0.5);
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+
+  z-index: 9999;
+
+  backdrop-filter: none !important;
+  filter: none !important;
 }
 
 .modal {
-  background: white;
-  border-radius: 10px;
-  width: 600px;
-  max-height: 90vh;
-  overflow-y: auto;
-  z-index: 1001;
-  display: block !important;
+  background: #fff;
+  width: 480px;
+  max-width: 90%;
+  border-radius: 12px;
+
+  position: relative;
+  z-index: 10000;
+
   opacity: 1 !important;
+  filter: none !important;
+  transform: none !important;
+
+  box-shadow: 0 20px 60px rgba(0,0,0,.25);
+}
+.page-container {
+  filter: none !important;
+}
+
+.app-shell {
+  display: flex;
+  height: 100vh;
+  overflow: clip;          /* ← clip au lieu de hidden : ne casse PAS position:fixed */
+  background: var(--bg-main);
+
+  .main-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: clip;         /* ← idem */
+    transition: margin-left 0.3s ease;
+  }
+
+  .content-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 2rem;
+    background: var(--bg-main);
+  }
 }
