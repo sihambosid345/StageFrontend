@@ -5,6 +5,9 @@ import { RouterModule, Router } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { PayrollService, PayrollRun, TaxBracket, StatutoryRate } from '../../../core/services/payroll-config.service';
 import { PayrollConfigWarningComponent } from '../config/warning.component';
+import { AuthService } from '../../../core/services/auth.service';
+import { CompanyService } from '../../../core/services/domain.services';
+import { Company } from '../../../core/models';
 
 @Component({
   selector: 'app-payroll-runs',
@@ -21,6 +24,16 @@ import { PayrollConfigWarningComponent } from '../config/warning.component';
         <button class="btn-primary" (click)="openCreateDialog()">
           <span class="btn-icon">+</span> Ajouter
         </button>
+      </div>
+
+      <!-- Filtre entreprise — SUPER_ADMIN uniquement -->
+      <div class="company-filter-bar" *ngIf="isSuperAdmin">
+        <label>🏢 Entreprise :</label>
+        <select (change)="onFilterCompanyChange($event)">
+          <option value="">Toutes les entreprises</option>
+          <option *ngFor="let c of companies" [value]="c.id">{{ c.name }}</option>
+        </select>
+        <span class="sa-badge">SUPER ADMIN</span>
       </div>
 
       <!-- Alerte configuration manquante -->
@@ -47,6 +60,7 @@ import { PayrollConfigWarningComponent } from '../config/warning.component';
           <table class="data-table">
             <thead>
               <tr>
+                <th *ngIf="isSuperAdmin">ENTREPRISE</th>
                 <th>PÉRIODE</th>
                 <th>N° RUN</th>
                 <th>STATUT</th>
@@ -59,15 +73,17 @@ import { PayrollConfigWarningComponent } from '../config/warning.component';
             </thead>
             <tbody>
               <tr *ngIf="loading">
-                <td colspan="8" class="loading-cell">
+                <td [attr.colspan]="isSuperAdmin ? 9 : 8" class="loading-cell">
                   <div class="spinner"></div> Chargement...
                 </td>
               </tr>
               <tr *ngIf="!loading && filteredRuns.length === 0">
-                <td colspan="8" class="empty-cell">Aucune exécution trouvée</td>
+                <td [attr.colspan]="isSuperAdmin ? 9 : 8" class="empty-cell">Aucune exécution trouvée</td>
               </tr>
               <tr *ngFor="let run of filteredRuns" class="table-row">
-                <!-- FIX #1 : guard sur period avant formatPeriod -->
+                <td *ngIf="isSuperAdmin" class="company-cell">
+                  {{ getCompanyName(run.companyId) }}
+                </td>
                 <td>{{ run?.period ? formatPeriod(run.period) : '—' }}</td>
                 <td>#{{ run?.runNumber ?? '—' }}</td>
                 <td>
@@ -132,6 +148,17 @@ import { PayrollConfigWarningComponent } from '../config/warning.component';
           <button class="modal-close" (click)="closeCreateDialog()">✕</button>
         </div>
         <div class="modal-body">
+          <!-- Sélecteur entreprise SUPER_ADMIN -->
+          <div *ngIf="isSuperAdmin" class="company-field" style="margin-bottom:1rem">
+            <label>Entreprise <span style="color:#ef4444">*</span></label>
+            <select [(ngModel)]="newCompanyId" class="form-input" style="margin-top:6px">
+              <option value="">— Sélectionner une entreprise —</option>
+              <option *ngFor="let c of companies" [value]="c.id">{{ c.name }}</option>
+            </select>
+            <small style="color:#6b7280;font-size:12px;margin-top:4px;display:block">
+              Le run sera créé pour cette entreprise.
+            </small>
+          </div>
           <label>Période (mois/année)</label>
           <input type="month" [(ngModel)]="newPeriod" class="form-input">
           <p class="hint" *ngIf="!configLoaded">
@@ -143,7 +170,7 @@ import { PayrollConfigWarningComponent } from '../config/warning.component';
         </div>
         <div class="modal-footer">
           <button class="btn-secondary" (click)="closeCreateDialog()">Annuler</button>
-          <button class="btn-primary" [disabled]="!newPeriod || creating" (click)="createRun()">
+          <button class="btn-primary" [disabled]="!newPeriod || creating || (isSuperAdmin && !newCompanyId)" (click)="createRun()">
             {{ creating ? 'Création...' : 'Créer' }}
           </button>
         </div>
@@ -172,91 +199,46 @@ import { PayrollConfigWarningComponent } from '../config/warning.component';
   `,
   styles: [`
     .page-container { padding: 24px; }
-
-    .page-header {
-      display: flex; align-items: flex-start;
-      justify-content: space-between; margin-bottom: 24px;
-    }
+    .page-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; }
     .page-title { font-size: 24px; font-weight: 700; color: #1a1a2e; margin: 0; }
     .page-subtitle { font-size: 13px; color: #6b7280; margin: 4px 0 0; }
-
-    .btn-primary {
-      display: flex; align-items: center; gap: 6px;
-      background: #4f46e5; color: white; border: none;
-      padding: 10px 20px; border-radius: 8px; font-size: 14px;
-      font-weight: 600; cursor: pointer; transition: background 0.2s;
-    }
+    .btn-primary { display: flex; align-items: center; gap: 6px; background: #4f46e5; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
     .btn-primary:hover { background: #4338ca; }
     .btn-primary:disabled { background: #9ca3af; cursor: not-allowed; }
-    .btn-secondary {
-      background: white; color: #374151; border: 1px solid #d1d5db;
-      padding: 10px 20px; border-radius: 8px; font-size: 14px;
-      font-weight: 600; cursor: pointer;
-    }
+    .btn-secondary { background: white; color: #374151; border: 1px solid #d1d5db; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
     .btn-icon { font-size: 18px; line-height: 1; }
-
-    .card {
-      background: white; border-radius: 12px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden;
-    }
-    .card-header {
-      display: flex; align-items: center;
-      justify-content: space-between; padding: 20px 24px;
-      border-bottom: 1px solid #f3f4f6;
-    }
+    /* Filtre entreprise SUPER_ADMIN */
+    .company-filter-bar { display: flex; align-items: center; gap: 0.75rem; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.875rem; flex-wrap: wrap; }
+    .company-filter-bar label { font-weight: 600; color: #1e40af; white-space: nowrap; }
+    .company-filter-bar select { border: 1px solid #93c5fd; border-radius: 6px; padding: 0.35rem 0.65rem; font-size: 0.875rem; color: #1e3a8a; background: white; flex: 1; min-width: 200px; max-width: 360px; }
+    .sa-badge { display: inline-flex; align-items: center; background: #ede9fe; color: #5b21b6; border-radius: 4px; padding: 0.15rem 0.5rem; font-size: 0.7rem; font-weight: 700; letter-spacing: .05em; }
+    .company-field label { display: block; font-size: 14px; font-weight: 600; color: #5b21b6; }
+    .company-field select { width: 100%; border: 1px solid #7c3aed; border-radius: 6px; padding: 0.5rem 0.75rem; font-size: 0.9rem; background: white; outline: none; }
+    .company-field select:focus { box-shadow: 0 0 0 3px rgba(124,58,237,.15); }
+    .company-cell { font-size: 12px; color: #6b7280; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* Card & Table */
+    .card { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden; }
+    .card-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid #f3f4f6; }
     .card-title { font-size: 16px; font-weight: 600; color: #111827; }
-
-    .search-box {
-      display: flex; align-items: center; gap: 8px;
-      background: #f9fafb; border: 1px solid #e5e7eb;
-      border-radius: 8px; padding: 8px 12px; width: 280px;
-    }
-    .search-box input {
-      border: none; background: none; outline: none;
-      font-size: 14px; color: #374151; width: 100%;
-    }
-
+    .search-box { display: flex; align-items: center; gap: 8px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px 12px; width: 280px; }
+    .search-box input { border: none; background: none; outline: none; font-size: 14px; color: #374151; width: 100%; }
     .table-wrapper { overflow-x: auto; }
     .data-table { width: 100%; border-collapse: collapse; }
-    .data-table th {
-      background: #f9fafb; padding: 12px 16px;
-      text-align: left; font-size: 11px; font-weight: 600;
-      color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em;
-      border-bottom: 1px solid #e5e7eb;
-    }
-    .data-table td {
-      padding: 14px 16px; font-size: 14px; color: #374151;
-      border-bottom: 1px solid #f3f4f6;
-    }
+    .data-table th { background: #f9fafb; padding: 12px 16px; text-align: left; font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #e5e7eb; }
+    .data-table td { padding: 14px 16px; font-size: 14px; color: #374151; border-bottom: 1px solid #f3f4f6; }
     .table-row:hover { background: #f9fafb; }
     .net-amount { color: #059669; font-weight: 600; }
-
-    .loading-cell, .empty-cell {
-      text-align: center; padding: 40px !important; color: #9ca3af;
-    }
-    .spinner {
-      display: inline-block; width: 16px; height: 16px;
-      border: 2px solid #e5e7eb; border-top-color: #4f46e5;
-      border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle;
-    }
+    .loading-cell, .empty-cell { text-align: center; padding: 40px !important; color: #9ca3af; }
+    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #e5e7eb; border-top-color: #4f46e5; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; }
     @keyframes spin { to { transform: rotate(360deg); } }
-
-    .badge {
-      display: inline-flex; align-items: center;
-      padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600;
-    }
+    .badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
     .badge-draft { background: #f3f4f6; color: #374151; }
     .badge-processing { background: #fef3c7; color: #92400e; }
     .badge-completed { background: #d1fae5; color: #065f46; }
     .badge-locked { background: #ede9fe; color: #5b21b6; }
     .badge-error { background: #fee2e2; color: #991b1b; }
-
     .actions-cell { display: flex; gap: 8px; align-items: center; }
-    .action-btn {
-      width: 34px; height: 34px; border-radius: 8px;
-      border: none; cursor: pointer; display: flex;
-      align-items: center; justify-content: center; transition: all 0.2s;
-    }
+    .action-btn { width: 34px; height: 34px; border-radius: 8px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
     .action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
     .btn-calculate { background: #d1fae5; color: #065f46; }
     .btn-calculate:hover:not(:disabled) { background: #a7f3d0; }
@@ -264,28 +246,15 @@ import { PayrollConfigWarningComponent } from '../config/warning.component';
     .btn-edit:hover:not(:disabled) { background: #e5e7eb; }
     .btn-delete { background: #fee2e2; color: #991b1b; }
     .btn-delete:hover:not(:disabled) { background: #fecaca; }
-
     /* Modal */
-    .modal-overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.4);
-      display: flex; align-items: center; justify-content: center; z-index: 1000;
-    }
-    .modal {
-      background: white; border-radius: 12px;
-      width: 480px; box-shadow: 0 20px 60px rgba(0,0,0,0.2);
-    }
-    .modal-header {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 20px 24px; border-bottom: 1px solid #f3f4f6;
-    }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+    .modal { background: white; border-radius: 12px; width: 480px; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid #f3f4f6; }
     .modal-header h2 { font-size: 18px; font-weight: 700; margin: 0; }
     .modal-close { background: none; border: none; font-size: 18px; cursor: pointer; color: #6b7280; }
     .modal-body { padding: 24px; }
     .modal-body label { display: block; font-size: 14px; font-weight: 500; color: #374151; margin-bottom: 6px; }
-    .form-input {
-      width: 100%; padding: 10px 12px; border: 1px solid #d1d5db;
-      border-radius: 8px; font-size: 14px; outline: none; box-sizing: border-box;
-    }
+    .form-input { width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; outline: none; box-sizing: border-box; }
     .form-input:focus { border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,0.1); }
     .hint { font-size: 13px; color: #92400e; background: #fef3c7; padding: 8px 12px; border-radius: 6px; margin-top: 12px; }
     .hint.success { color: #065f46; background: #d1fae5; }
@@ -298,9 +267,15 @@ export class PayrollRunsComponent implements OnInit, OnDestroy {
   loading = false;
   searchTerm = '';
 
+  // SUPER_ADMIN
+  isSuperAdmin = false;
+  companies: Company[] = [];
+  selectedFilterCompanyId: string | null = null;
+
   // Modal créer
   showCreateModal = false;
   newPeriod = '';
+  newCompanyId = '';
   creating = false;
 
   // Modal éditer
@@ -316,10 +291,27 @@ export class PayrollRunsComponent implements OnInit, OnDestroy {
 
   private destroy$ = new Subject<void>();
 
-  constructor(private payrollSvc: PayrollService, private router: Router) {}
+  constructor(
+    private payrollSvc: PayrollService,
+    private auth: AuthService,
+    private companySvc: CompanyService,
+    private router: Router
+  ) {}
 
   ngOnInit(): void {
-    this.loadRuns();
+    this.isSuperAdmin = this.auth.isSuperAdmin();
+
+    if (this.isSuperAdmin) {
+      this.companySvc.getAll()
+        .pipe(takeUntil(this.destroy$))
+        .subscribe({
+          next: (companies) => { this.companies = companies; this.loadRuns(); },
+          error: () => this.loadRuns()
+        });
+    } else {
+      this.loadRuns();
+    }
+
     this.checkPayrollConfig();
   }
 
@@ -328,15 +320,30 @@ export class PayrollRunsComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
+  onFilterCompanyChange(event: Event): void {
+    const val = (event.target as HTMLSelectElement).value;
+    this.selectedFilterCompanyId = val || null;
+    this.loadRuns();
+  }
+
+  getCompanyName(companyId: string | null | undefined): string {
+    if (!companyId) return '—';
+    return this.companies.find(c => c.id === companyId)?.name ?? companyId;
+  }
+
   // ─── Chargement ────────────────────────────────────────────
 
   loadRuns(): void {
     this.loading = true;
-    this.payrollSvc.getPayrollRuns()
-      .pipe(takeUntil(this.destroy$))
+
+    // SUPER_ADMIN : passe ?companyId= si un filtre est sélectionné
+    const obs = this.isSuperAdmin
+      ? this.payrollSvc.getPayrollRuns(this.selectedFilterCompanyId ?? undefined)
+      : this.payrollSvc.getPayrollRuns();
+
+    obs.pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (res: any) => {
-          // Backend peut retourner [] ou { data: [] }
           const runs: PayrollRun[] = Array.isArray(res) ? res : (res?.data ?? []);
           this.runs = runs;
           this.filteredRuns = runs;
@@ -408,20 +415,16 @@ export class PayrollRunsComponent implements OnInit, OnDestroy {
 
   // ─── Actions ───────────────────────────────────────────────
 
-  // FIX #2 : navigate vers la bonne page selon statut
   handlePrimary(run: PayrollRun): void {
     if (run.status === 'COMPLETED' || run.status === 'LOCKED') {
       this.router.navigate(['/payroll/runs', run.id, 'payslips']);
     } else {
-      // DRAFT ou ERROR → page calcul
       this.router.navigate(['/payroll/runs', run.id, 'calculate']);
     }
   }
 
-  // FIX #3 : edit → modal inline (pas de navigate vers route inexistante)
   editRun(run: PayrollRun): void {
     this.editingRun = run;
-    // Convertir la période stockée 'YYYY-MM' pour l'input type="month"
     this.editPeriod = run.period ?? '';
     this.showEditModal = true;
   }
@@ -435,19 +438,11 @@ export class PayrollRunsComponent implements OnInit, OnDestroy {
   saveEdit(): void {
     if (!this.editingRun || !this.editPeriod) return;
     this.saving = true;
-    // Appel PATCH/PUT sur le run
     this.payrollSvc.updatePayrollRun(this.editingRun.id, { period: this.editPeriod })
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: () => {
-          this.saving = false;
-          this.closeEditDialog();
-          this.loadRuns();
-        },
-        error: (err) => {
-          console.error('Erreur modification run:', err);
-          this.saving = false;
-        }
+        next: () => { this.saving = false; this.closeEditDialog(); this.loadRuns(); },
+        error: (err) => { console.error('Erreur modification run:', err); this.saving = false; }
       });
   }
 
@@ -466,31 +461,34 @@ export class PayrollRunsComponent implements OnInit, OnDestroy {
   openCreateDialog(): void {
     const now = new Date();
     this.newPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    this.newCompanyId = this.isSuperAdmin ? '' : '';
     this.showCreateModal = true;
   }
 
   closeCreateDialog(): void {
     this.showCreateModal = false;
     this.newPeriod = '';
+    this.newCompanyId = '';
   }
 
   createRun(): void {
     if (!this.newPeriod) return;
+    if (this.isSuperAdmin && !this.newCompanyId) return;
     this.creating = true;
-    this.payrollSvc.createPayrollRun(this.newPeriod)
-      .pipe(takeUntil(this.destroy$))
+
+    const obs = this.isSuperAdmin
+      ? this.payrollSvc.createPayrollRunForCompany(this.newPeriod, this.newCompanyId)
+      : this.payrollSvc.createPayrollRun(this.newPeriod);
+
+    obs.pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (run) => {
           this.creating = false;
           this.closeCreateDialog();
           this.loadRuns();
-          // Navigate vers calcul après création
           this.router.navigate(['/payroll/runs', run.id, 'calculate']);
         },
-        error: (err) => {
-          console.error('Erreur création run:', err);
-          this.creating = false;
-        }
+        error: (err) => { console.error('Erreur création run:', err); this.creating = false; }
       });
   }
 

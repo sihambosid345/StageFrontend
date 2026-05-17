@@ -3,6 +3,16 @@
   <button class="btn btn-primary" (click)="openCreate()"><i class="bi bi-plus-lg"></i> Ajouter</button>
 </div>
 
+<!-- Filtre entreprise — SUPER_ADMIN uniquement -->
+<div class="company-filter-bar" *ngIf="isSuperAdmin">
+  <label>🏢 Entreprise :</label>
+  <select (change)="onFilterCompanyChange($event)">
+    <option value="">Toutes les entreprises</option>
+    <option *ngFor="let c of companies" [value]="c.id">{{ c.name }}</option>
+  </select>
+  <span class="sa-badge">SUPER ADMIN</span>
+</div>
+
 <div class="table-container">
   <div class="table-toolbar">
     <h2>Lignes de paie</h2>
@@ -15,10 +25,23 @@
   <div class="table-scroll" *ngIf="!loading">
     <table *ngIf="filtered.length > 0">
       <thead>
-        <tr><th>Employé</th><th>Exécution</th><th>Type</th><th>Libellé</th><th>Montant</th><th>Imposable</th><th>CNSS</th><th>Actions</th></tr>
+        <tr>
+          <th *ngIf="isSuperAdmin">Entreprise</th>
+          <th>Employé</th>
+          <th>Exécution</th>
+          <th>Type</th>
+          <th>Libellé</th>
+          <th>Montant</th>
+          <th>Imposable</th>
+          <th>CNSS</th>
+          <th>Actions</th>
+        </tr>
       </thead>
       <tbody>
         <tr *ngFor="let item of filtered">
+          <td *ngIf="isSuperAdmin" style="font-size:12px;color:#6b7280">
+            {{ getCompanyName(item.companyId) }}
+          </td>
           <td>
             <div class="emp-cell">
               <div class="emp-avatar">{{ getEmployeeName(item.employeeId).charAt(0) }}</div>
@@ -55,6 +78,18 @@
     </div>
     <div class="modal-body">
       <div class="error-msg" *ngIf="error"><i class="bi bi-exclamation-triangle-fill"></i> {{ error }}</div>
+
+      <!-- Sélecteur entreprise SUPER_ADMIN -->
+      <div class="form-group company-field" *ngIf="isSuperAdmin" style="background:#f5f3ff;border:1px solid #c4b5fd;border-radius:8px;padding:1rem;margin-bottom:1rem">
+        <label style="color:#5b21b6;font-weight:600">Entreprise <span class="req">*</span></label>
+        <select [(ngModel)]="form.companyId" style="border-color:#7c3aed">
+          <option [ngValue]="null" disabled>— Sélectionner une entreprise —</option>
+          <option *ngFor="let c of companies" [value]="c.id">{{ c.name }}</option>
+        </select>
+        <small style="color:#6b7280;font-size:12px;margin-top:4px;display:block">
+          La ligne sera associée à cette entreprise.
+        </small>
+      </div>
 
       <div class="form-group">
         <label>Exécution de paie <span class="req">*</span></label>

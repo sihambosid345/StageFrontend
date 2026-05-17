@@ -1,10 +1,11 @@
 import { Component, OnInit, ChangeDetectorRef, NgZone, ApplicationRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { PayrollItemService, PayrollRunService, EmployeeService } from '../../../core/services/domain.services';
+import { PayrollItemService, PayrollRunService, EmployeeService, CompanyService } from '../../../core/services/domain.services';
 import { AuthService } from '../../../core/services/auth.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { PAYROLL_ITEM_TYPE_OPTIONS } from '../../../core/models';
+import { Company } from '../../../core/models';
 
 @Component({
   selector: 'app-items',
@@ -25,9 +26,15 @@ export class ItemsComponent implements OnInit {
   search = '';
   error = '';
 
+  // SUPER_ADMIN
+  isSuperAdmin = false;
+  companies: Company[] = [];
+  selectedFilterCompanyId: string | null = null;
+
   readonly itemTypeOptions = PAYROLL_ITEM_TYPE_OPTIONS;
 
   form: any = {
+    companyId: null,
     payrollRunId: '', employeeId: '',
     itemType: 'BASE_SALARY', label: '', amount: 0,
     taxable: false, cnssApplicable: false
@@ -37,6 +44,7 @@ export class ItemsComponent implements OnInit {
     private service: PayrollItemService,
     private runService: PayrollRunService,
     private employeeService: EmployeeService,
+    private companySvc: CompanyService,
     private auth: AuthService,
     private toastService: ToastService,
     private cdr: ChangeDetectorRef,
@@ -45,12 +53,38 @@ export class ItemsComponent implements OnInit {
   ) {}
 
   ngOnInit() {
-    requestAnimationFrame(() => {
-      this.ngZone.run(() => { this.loadAll(); });
-    });
-    setTimeout(() => {
-      if (this.items.length === 0) this.loadAll();
-    }, 500);
+    this.isSuperAdmin = this.auth.isSuperAdmin();
+
+    if (this.isSuperAdmin) {
+      this.companySvc.getAll().subscribe({
+        next: (companies) => {
+          this.ngZone.run(() => {
+            this.companies = companies;
+            this.loadAll();
+            this.cdr.detectChanges();
+          });
+        },
+        error: () => this.loadAll()
+      });
+    } else {
+      requestAnimationFrame(() => {
+        this.ngZone.run(() => { this.loadAll(); });
+      });
+      setTimeout(() => {
+        if (this.items.length === 0) this.loadAll();
+      }, 500);
+    }
+  }
+
+  onFilterCompanyChange(event: Event): void {
+    const val = (event.target as HTMLSelectElement).value;
+    this.selectedFilterCompanyId = val || null;
+    this.loadAll();
+  }
+
+  getCompanyName(companyId: string | null | undefined): string {
+    if (!companyId) return '—';
+    return this.companies.find(c => c.id === companyId)?.name ?? companyId;
   }
 
   loadAll() {
@@ -71,7 +105,12 @@ export class ItemsComponent implements OnInit {
   }
 
   loadRuns() {
-    this.runService.getAll().subscribe({
+    // SUPER_ADMIN : charge les runs de l'entreprise filtrée (ou tous)
+    const obs = this.isSuperAdmin && this.selectedFilterCompanyId
+      ? this.runService.getByCompany(this.selectedFilterCompanyId)
+      : this.runService.getAll();
+
+    obs.subscribe({
       next: (d: any[]) => {
         this.ngZone.run(() => { this.runs = d || []; this.cdr.detectChanges(); });
       },
@@ -84,7 +123,11 @@ export class ItemsComponent implements OnInit {
     this.service.getAll().subscribe({
       next: (data: any[]) => {
         this.ngZone.run(() => {
-          this.items = data || [];
+          // SUPER_ADMIN : filtre côté client si companyId sélectionné
+          const all = data || [];
+          this.items = this.isSuperAdmin && this.selectedFilterCompanyId
+            ? all.filter((i: any) => i.companyId === this.selectedFilterCompanyId)
+            : all;
           this.applySearch();
           this.loading = false;
           this.cdr.detectChanges();
@@ -126,6 +169,7 @@ export class ItemsComponent implements OnInit {
 
   openCreate() {
     this.form = {
+      companyId: this.isSuperAdmin ? (this.selectedFilterCompanyId || null) : null,
       payrollRunId: '', employeeId: '',
       itemType: 'BASE_SALARY', label: '', amount: 0,
       taxable: false, cnssApplicable: false
@@ -137,6 +181,7 @@ export class ItemsComponent implements OnInit {
 
   openEdit(item: any) {
     this.form = {
+      companyId: item.companyId || null,
       payrollRunId: item.payrollRunId, employeeId: item.employeeId,
       itemType: item.itemType, label: item.label, amount: item.amount,
       taxable: item.taxable, cnssApplicable: item.cnssApplicable
@@ -151,11 +196,21 @@ export class ItemsComponent implements OnInit {
       this.error = 'Exécution, employé et libellé sont obligatoires.';
       return;
     }
+
+    // SUPER_ADMIN doit sélectionner une entreprise
+    if (this.isSuperAdmin && !this.form.companyId) {
+      this.error = 'Veuillez sélectionner une entreprise.';
+      return;
+    }
+
     const selectedRun = this.runs.find((r: any) => r.id === this.form.payrollRunId);
     if (!selectedRun) { this.error = 'Exécution de paie introuvable.'; return; }
 
     const payload: any = {
-      companyId: selectedRun.companyId || selectedRun.company?.id || null,
+      companyId: this.form.companyId
+        || selectedRun.companyId
+        || selectedRun.company?.id
+        || null,
       payrollRunId: this.form.payrollRunId,
       employeeId: this.form.employeeId,
       itemType: this.form.itemType,

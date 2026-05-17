@@ -156,16 +156,24 @@ export class PayrollService {
 
   // ─── PAYROLL RUNS ──────────────────────────────────────────────────────────
 
-  getPayrollRuns(): Observable<PayrollRun[]> {
-    return this.http.get<PayrollRun[]>(`${this.api}/payroll/runs`);
+  getPayrollRuns(companyId?: string): Observable<PayrollRun[]> {
+    let params = new HttpParams();
+    if (companyId) params = params.set('companyId', companyId);
+    return this.http.get<PayrollRun[]>(`${this.api}/payroll/runs`, { params });
   }
 
   getPayrollRun(id: string): Observable<PayrollRun> {
     return this.http.get<PayrollRun>(`${this.api}/payroll/runs/${id}`);
   }
 
+  // Création standard (Admin normal — companyId vient du token JWT)
   createPayrollRun(period: string): Observable<PayrollRun> {
     return this.http.post<PayrollRun>(`${this.api}/payroll/runs`, { period });
+  }
+
+  // Création SUPER_ADMIN — companyId explicite dans le body
+  createPayrollRunForCompany(period: string, companyId: string): Observable<PayrollRun> {
+    return this.http.post<PayrollRun>(`${this.api}/payroll/runs`, { period, companyId });
   }
 
   deletePayrollRun(id: string): Observable<void> {
