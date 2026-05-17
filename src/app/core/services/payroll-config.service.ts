@@ -33,12 +33,14 @@ export interface TaxBracket {
 export interface PayrollRun {
   id: string;
   runNumber: number;
-  period: string;         // 'YYYY-MM'
+  period: string;                    // 'YYYY-MM'
   status: 'DRAFT' | 'PROCESSING' | 'COMPLETED' | 'LOCKED' | 'ERROR';
-  employeeCount: number;
-  totalGross: number;
-  totalNet: number;
-  employerContributions: number;
+  employeeCount?: number | null;
+  totalGross?: number | null;
+  totalNet?: number | null;
+  employerContributions?: number | null;
+  companyId?: string | null;         // présent quand le backend inclut la relation
+  company?: { id: string; name: string } | null;
   createdAt: string;
   updatedAt: string;
 }
