@@ -30,7 +30,11 @@
       </thead>
       <tbody>
         <tr *ngFor="let item of filtered">
-          <td>{{ getPeriodLabel(item.payrollPeriodId) }}</td>
+          <td>
+  {{ item.payrollPeriod 
+     ? (getMonthName(item.payrollPeriod.month) + ' ' + item.payrollPeriod.year) 
+     : getPeriodLabel(item.payrollPeriodId) }}
+</td>
           <td>#{{ item.runNumber }}</td>
           <td><span class="badge" [ngClass]="statusClass(item.status)">{{ item.status }}</span></td>
           <td>{{ item.totalEmployees ?? 0 }}</td>

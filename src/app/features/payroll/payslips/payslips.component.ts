@@ -120,14 +120,33 @@ export class PayslipsComponent implements OnInit {
   onSearch() { this.applySearch(); }
 
   getEmployeeName(id: string): string {
-    const e = this.employees.find(e => e.id === id);
-    return e ? `${e.firstName} ${e.lastName}` : id;
+  // 1. Chercher dans les données joinées du payslip directement
+  const item = this.items.find(i => i.employeeId === id);
+  if (item?.employee) {
+    return `${item.employee.firstName} ${item.employee.lastName}`;
   }
+  // 2. Fallback: chercher dans le tableau employees chargé séparément
+  const e = this.employees.find(e => e.id === id);
+  return e ? `${e.firstName} ${e.lastName}` : id;
+}
+
 
   getPeriodLabel(id: string): string {
-    const p = this.periods.find(p => p.id === id);
-    return p ? `${p.month}/${p.year}` : '—';
+  // 1. Chercher dans les données joinées
+  const item = this.items.find(i => i.payrollPeriodId === id);
+  if (item?.payrollPeriod) {
+    const months = [
+      'Janvier','Février','Mars','Avril','Mai','Juin',
+      'Juillet','Août','Septembre','Octobre','Novembre','Décembre'
+    ];
+    const m = item.payrollPeriod.month;
+    const y = item.payrollPeriod.year;
+    return `${months[m - 1]} ${y}`;
   }
+  // 2. Fallback: chercher dans le tableau periods
+  const p = this.periods.find(p => p.id === id);
+  return p ? `${p.month}/${p.year}` : '—';
+}
 
   openCreate() {
     this.form = {

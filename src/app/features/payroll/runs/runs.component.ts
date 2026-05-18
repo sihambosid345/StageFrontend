@@ -197,7 +197,9 @@ import { Company } from '../../../core/models';
       </div>
     </div>
   `,
-  styles: [`
+  // Dans le tableau styles du @Component, remplacez le contenu par ceci :
+
+styles: [`
     .page-container { padding: 24px; }
     .page-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; }
     .page-title { font-size: 24px; font-weight: 700; color: #1a1a2e; margin: 0; }
@@ -207,6 +209,7 @@ import { Company } from '../../../core/models';
     .btn-primary:disabled { background: #9ca3af; cursor: not-allowed; }
     .btn-secondary { background: white; color: #374151; border: 1px solid #d1d5db; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
     .btn-icon { font-size: 18px; line-height: 1; }
+    
     /* Filtre entreprise SUPER_ADMIN */
     .company-filter-bar { display: flex; align-items: center; gap: 0.75rem; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.875rem; flex-wrap: wrap; }
     .company-filter-bar label { font-weight: 600; color: #1e40af; white-space: nowrap; }
@@ -216,6 +219,7 @@ import { Company } from '../../../core/models';
     .company-field select { width: 100%; border: 1px solid #7c3aed; border-radius: 6px; padding: 0.5rem 0.75rem; font-size: 0.9rem; background: white; outline: none; }
     .company-field select:focus { box-shadow: 0 0 0 3px rgba(124,58,237,.15); }
     .company-cell { font-size: 12px; color: #6b7280; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    
     /* Card & Table */
     .card { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden; }
     .card-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid #f3f4f6; }
@@ -246,19 +250,114 @@ import { Company } from '../../../core/models';
     .btn-edit:hover:not(:disabled) { background: #e5e7eb; }
     .btn-delete { background: #fee2e2; color: #991b1b; }
     .btn-delete:hover:not(:disabled) { background: #fecaca; }
-    /* Modal */
-    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-    .modal { background: white; border-radius: 12px; width: 480px; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
-    .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid #f3f4f6; }
-    .modal-header h2 { font-size: 18px; font-weight: 700; margin: 0; }
-    .modal-close { background: none; border: none; font-size: 18px; cursor: pointer; color: #6b7280; }
-    .modal-body { padding: 24px; }
-    .modal-body label { display: block; font-size: 14px; font-weight: 500; color: #374151; margin-bottom: 6px; }
-    .form-input { width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; outline: none; box-sizing: border-box; }
-    .form-input:focus { border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,0.1); }
-    .hint { font-size: 13px; color: #92400e; background: #fef3c7; padding: 8px 12px; border-radius: 6px; margin-top: 12px; }
-    .hint.success { color: #065f46; background: #d1fae5; }
-    .modal-footer { display: flex; gap: 12px; justify-content: flex-end; padding: 20px 24px; border-top: 1px solid #f3f4f6; }
+    
+    /* Modal - CORRECTION TOTALE */
+    .modal-overlay { 
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: 0 !important;
+      background: rgba(0,0,0,0.5) !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      z-index: 100000 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      backdrop-filter: none !important;
+    }
+    
+    .modal { 
+      background: white !important;
+      width: 480px !important;
+      max-width: 90% !important;
+      border-radius: 12px !important;
+      position: relative !important;
+      z-index: 100001 !important;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3) !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+      display: block !important;
+    }
+    
+    .modal-header { 
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      padding: 20px 24px !important;
+      border-bottom: 1px solid #f3f4f6 !important;
+    }
+    
+    .modal-header h2 { 
+      font-size: 18px !important;
+      font-weight: 700 !important;
+      margin: 0 !important;
+      color: #1a1a2e !important;
+    }
+    
+    .modal-close { 
+      background: none !important;
+      border: none !important;
+      font-size: 20px !important;
+      cursor: pointer !important;
+      color: #6b7280 !important;
+      padding: 4px 8px !important;
+    }
+    
+    .modal-close:hover {
+      color: #374151 !important;
+    }
+    
+    .modal-body { 
+      padding: 24px !important;
+    }
+    
+    .modal-body label { 
+      display: block !important;
+      font-size: 14px !important;
+      font-weight: 500 !important;
+      color: #374151 !important;
+      margin-bottom: 6px !important;
+    }
+    
+    .form-input { 
+      width: 100% !important;
+      padding: 10px 12px !important;
+      border: 1px solid #d1d5db !important;
+      border-radius: 8px !important;
+      font-size: 14px !important;
+      outline: none !important;
+      box-sizing: border-box !important;
+      background: white !important;
+    }
+    
+    .form-input:focus { 
+      border-color: #4f46e5 !important;
+      box-shadow: 0 0 0 3px rgba(79,70,229,0.1) !important;
+    }
+    
+    .hint { 
+      font-size: 13px !important;
+      color: #92400e !important;
+      background: #fef3c7 !important;
+      padding: 8px 12px !important;
+      border-radius: 6px !important;
+      margin-top: 12px !important;
+    }
+    
+    .hint.success { 
+      color: #065f46 !important;
+      background: #d1fae5 !important;
+    }
+    
+    .modal-footer { 
+      display: flex !important;
+      gap: 12px !important;
+      justify-content: flex-end !important;
+      padding: 20px 24px !important;
+      border-top: 1px solid #f3f4f6 !important;
+    }
   `]
 })
 export class PayrollRunsComponent implements OnInit, OnDestroy {
@@ -393,17 +492,31 @@ export class PayrollRunsComponent implements OnInit, OnDestroy {
   // ─── Formatage ─────────────────────────────────────────────
 
   formatPeriod(period: string | undefined | null): string {
-    if (!period) return '—';
-    const parts = period.split('-');
-    if (parts.length < 2) return period;
-    const [year, month] = parts;
+  if (!period) return '—';
+  const parts = period.split('-');
+  if (parts.length < 2) return period;
+  const [year, month] = parts;
+  const months = [
+    'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+    'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+  ];
+  const idx = parseInt(month, 10) - 1;
+  return `${months[idx] ?? month} ${year}`;
+}
+getRunPeriod(run: any): string {
+  // 1. Données joinées depuis le backend (payrollPeriod: { year, month })
+  if (run?.payrollPeriod?.year && run?.payrollPeriod?.month) {
     const months = [
       'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
       'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
     ];
-    const idx = parseInt(month, 10) - 1;
-    return `${months[idx] ?? month} ${year}`;
+    return `${months[run.payrollPeriod.month - 1]} ${run.payrollPeriod.year}`;
   }
+  // 2. Fallback: champ period string "YYYY-MM"
+  if (run?.period) return this.formatPeriod(run.period);
+  return '—';
+}
+
 
   getStatusClass(status: string): string {
     const map: Record<string, string> = {
