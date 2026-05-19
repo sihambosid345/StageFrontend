@@ -84,7 +84,7 @@ import { Company } from '../../../core/models';
                 <td *ngIf="isSuperAdmin" class="company-cell">
                   {{ getCompanyName(run.companyId) }}
                 </td>
-                <td>{{ run?.period ? formatPeriod(run.period) : '—' }}</td>
+                <td>{{ getRunPeriod(run) }}</td>
                 <td>#{{ run?.runNumber ?? '—' }}</td>
                 <td>
                   <span class="badge" [ngClass]="getStatusClass(run.status)">
