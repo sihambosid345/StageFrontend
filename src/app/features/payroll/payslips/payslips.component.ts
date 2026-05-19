@@ -253,7 +253,7 @@ export class PayslipsComponent implements OnInit, OnDestroy {
 
   loadPayslips(): void {
     this.loading = true;
-    this.http.get<any[]>(`${this.api}/payroll/runs/${this.runId}/payslips`)
+    this.http.get<any[]>(`${this.api}/payroll/payslips/run/${this.runId}`)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (data) => {
@@ -315,7 +315,7 @@ export class PayslipsComponent implements OnInit, OnDestroy {
   downloadPdf(p: any): void {
     this.downloadingId = p.id;
     // Use window.open for simple download — avoids blob complexities
-    const url = `${this.api}/payroll/runs/${this.runId}/payslips/${p.id}/pdf`;
+    const url = `${this.api}/payroll/payslips/${p.id}/generate-pdf`;
     // Fetch as blob to handle auth headers if needed
     this.http.get(url, { responseType: 'blob' })
       .pipe(takeUntil(this.destroy$))
